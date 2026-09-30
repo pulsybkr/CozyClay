@@ -28,7 +28,13 @@ import { fail } from "./shared.js";
 const input = (required, optional = {}) => ({ type: "object", properties: { ...required, ...optional }, required: Object.keys(required), additionalProperties: false });
 
 export const declarations = Object.freeze([
-	{ ...studioActionDeclaration("asset.searchLibrary"), kind: "job", domain: "library",
+	// A search authors NOTHING, so it must not open a transaction: declared as a
+	// mutation it would need an undo entry it has no use for, and as a transient
+	// its answer would be dropped (the bus only carries `output` for a job, a
+	// document or a long mutation). A job with a short deadline is exactly the
+	// shape of "reads something, answers with a value": no domain to commit, no
+	// history entry, and `output.models` still reaches the panel.
+	{ ...studioActionDeclaration("asset.searchLibrary"), kind: "job", domain: null,
 		input: input({ query: { type: "string", minLength: 1, maxLength: 120 } }, { limit: { type: "integer", minimum: 1, maximum: 20 } }) },
 	{ ...studioActionDeclaration("asset.downloadLibraryModel"), kind: "job", domain: "objects",
 		input: input(

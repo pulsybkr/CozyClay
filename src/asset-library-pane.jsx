@@ -17,6 +17,7 @@ import { useBus } from "./app-context.js";
 import { ko, isKo } from "./locale.js";
 import "./asset-library-pane.css";
 import {
+	DEFAULT_LIBRARY_LIMIT,
 	DEFAULT_LIBRARY_QUERY,
 	SEARCH_DEBOUNCE_MS,
 	libraryBlockedReason,
@@ -57,7 +58,7 @@ function LibraryCard({ card, onPlace, busy }) {
  * The pane. `onPlaced` receives the receipt so a host can select the new object
  * and report what happened; the pane never writes to the document itself.
  */
-export default function AssetLibraryPane({ onPlaced, limit = 12 }) {
+export default function AssetLibraryPane({ onPlaced, limit = DEFAULT_LIBRARY_LIMIT }) {
 	const bus = useBus();
 	const [query, setQuery] = useState("");
 	const [state, setState] = useState({ status: "idle", cards: [], total: 0, reason: null, warnings: [] });
@@ -81,6 +82,14 @@ export default function AssetLibraryPane({ onPlaced, limit = 12 }) {
 			return;
 		}
 		if (requestRef.current !== ticket) return;
+		// A refused command answers with a receipt, it does not throw. Treating
+		// that as "no results" would hide a real fault (a busy editor, an action
+		// made unavailable) behind a sentence about the library, so it is shown
+		// as what it is.
+		if (receipt?.ok === false) {
+			setState({ status: "error", cards: [], total: 0, reason: receipt.message ?? ko("The search was refused.", "검색이 거부되었습니다."), warnings: [] });
+			return;
+		}
 		const output = receipt?.output ?? {};
 		setState({
 			status: "ready",
@@ -110,9 +119,13 @@ export default function AssetLibraryPane({ onPlaced, limit = 12 }) {
 	}, [bus, onPlaced]);
 
 	const heading = libraryStatusLine(state, isKo);
+	// The raw total is on the element as well as in the line: a search that came
+	// back with 40 models of which none could be drawn is a DIFFERENT problem
+	// from a search that found nothing, and both read as "no models" otherwise.
+	const total = Number.isFinite(state.total) ? state.total : 0;
 
 	return (
-		<section className="assets-section library-pane">
+		<section className="assets-section library-pane" data-library-status={state.status} data-library-total={total} data-library-cards={state.cards.length}>
 			<h3 className="assets-section-title">{ko("3D library", "3D 라이브러리")}</h3>
 			<div className="library-search">
 				<input

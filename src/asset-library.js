@@ -18,6 +18,17 @@ export const DEFAULT_LIBRARY_QUERY = "chair";
 export const SEARCH_DEBOUNCE_MS = 120;
 
 /**
+ * How many results the pane asks for.
+ *
+ * Not a taste decision: every search answer is cloned into the command
+ * receipt, and the bus refuses a receipt past 8 KiB ("use a detail cursor").
+ * Measured on the live library, eight rows is about 5 KiB, twelve is about
+ * 8.1 KiB — one row of headroom over the limit. Eight keeps a comfortable
+ * margin while still filling the grid.
+ */
+export const DEFAULT_LIBRARY_LIMIT = 8;
+
+/**
  * One search row as a card the pane can draw, or null when it cannot act on it.
  *
  * `usable` is the licence gate. It is deliberately the ONLY thing that disables

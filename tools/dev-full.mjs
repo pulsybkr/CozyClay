@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { handleOAuthRequest } from "../bin/codex-auth.mjs";
 import { createAgentHandler } from "../bin/agent/agent-routes.mjs";
+import { createPolyPizzaRoute } from "../bin/agent/poly-pizza-route.mjs";
 import { fileURLToPath } from "node:url";
 import {
 	installSignalCleanup,
@@ -96,6 +97,11 @@ if (kimodoHost || process.env.CCLAY_KIMODO_API_URL?.trim()) {
 const getBridgeOrigin = () => bridge && bridgePort !== undefined && bridge.exitCode === null && bridge.signalCode === null
 	? `http://127.0.0.1:${bridgePort}` : null;
 const agentHandler = createAgentHandler({ port: mainPort, getBridgeOrigin });
+// The 3D asset library is mounted here rather than inside the agent handler:
+// its API sends no CORS headers, so a search can only be made from this
+// process, where the key lives. Its models come from a CDN that does send
+// them, and the editor downloads those directly.
+const polyHandler = createPolyPizzaRoute({ env: process.env });
 const oauthServer = createServer((req, res) => {
 	const path = (req.url || "").split("?")[0];
 	const hosts = new Set([`127.0.0.1:${mainPort}`, `localhost:${mainPort}`]);
