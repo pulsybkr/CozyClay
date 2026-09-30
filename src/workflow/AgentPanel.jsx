@@ -367,6 +367,12 @@ export default function AgentPanel({
 		onReceipt: (receipt) => receiptRef.current?.(receipt),
 		onAuthLost: () => setAuthState("signed-out"),
 	}), [surface, transport]);
+	useEffect(() => {
+		if (surface !== "studio") return;
+		const draftRequest = event => { if (typeof event.detail === "string") { store.setDraft(event.detail); composerRef.current?.focus(); } };
+		window.addEventListener("cozyclay:agent-draft", draftRequest);
+		return () => window.removeEventListener("cozyclay:agent-draft", draftRequest);
+	}, [surface, store]);
 	const chat = useSyncExternalStore(store.subscribe, store.getState, store.getState);
 	const { draft, items, pendingAttachments, quota, rateLimit, streaming } = chat;
 

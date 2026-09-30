@@ -5,6 +5,11 @@
 
 export const STARTER_SCENES = Object.freeze([
 	Object.freeze({
+		id: "vrm-dialogue",
+		name: "VRM · Simple scene",
+		blurb: "Sakura and CHAR 02 in a small colorful set. A ten-second static shot, ready for animation.",
+	}),
+	Object.freeze({
 		id: "city-block",
 		name: "City Block",
 		blurb: "The set from the cozyclay.org tutorial: an alley, parked cars, one character mid-walk.",

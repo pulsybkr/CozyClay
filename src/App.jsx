@@ -1,3 +1,5 @@
+import FacialExpressionsPanel from "./panels/FacialExpressionsPanel.jsx";
+import { applyVrmExpressions, snapshotVrmExpressions, restoreVrmExpressions } from "./vrm-runtime.js";
 import { useMotion } from "./domains/motion.js";
 import TakeBarPanel from "./panels/TakeBarPanel.jsx";
 import RigControlPanel from "./panels/RigControlPanel.jsx";
@@ -76,6 +78,7 @@ import { createStudioAppActions } from "./commands/index.js";
 import { createStudioAppBinding } from "./studio-app-binding.js";
 import { AppContext, createAppContext } from "./app-context.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { characterModel } from "./character-models.js";
 import HierarchyPanel from "./hierarchy-panel.jsx";
 import { PlanBoard } from "./planview.jsx";
 import { autoColorHex, loadAutoColor, saveAutoColor } from "./auto-color.js";
@@ -2514,10 +2517,10 @@ export default function App() {
 	const buildStudioAgentContext = () => {
 		if (!liveWorkspaceHandleRef.current) {
 			setStudioAgentError(ko("The live editor is disconnected. Reconnect before sending.", "라이브 편집기가 연결되지 않았어요. 연결 후 보내 주세요."));
-			return null;
+			throw new Error("The live editor is disconnected. Start the full development server and reconnect before sending.");
 		}
 		try { const value = studioBindingRef.current.context(); setStudioAgentError(null); return value; }
-		catch (error) { setStudioAgentError(`${error.code ?? "INVALID_CONTEXT"}: ${error.message}`); return null; }
+		catch (error) { setStudioAgentError(`${error.code ?? "INVALID_CONTEXT"}: ${error.message}`); throw error; }
 	};
 	useEffect(() => {
 		if (embedMode) return;
@@ -2949,6 +2952,9 @@ export default function App() {
 	// Cast render props, memoized with Character itself (React.memo): during
 	// playback the playhead ticks 24 times a second, and a character whose
 	// props did not change must not re-render its subtree.
+	useEffect(() => {
+		for (const entry of characters) applyVrmExpressions(rigs[entry.id], entry.expressions, tlFrame / TIMELINE_FPS);
+	}, [characters, rigs, tlFrame]);
 	const characterViews = useMemo(() => characters.flatMap((entry, index) => {
 		if (entry.hidden) return [];
 		// Each cast member is driven by ITS OWN clip: the active one reads
@@ -2957,6 +2963,7 @@ export default function App() {
 		return [{
 			id: entry.id,
 			url: characterModelUrl(entry.model),
+			format: characterModel(entry.model)?.format,
 			position: clip ? [clip.anchorX, entry.y ?? 0, clip.anchorZ] : [entry.x, entry.y ?? 0, entry.z],
 			rot: clip ? clip.rotationDeg : entry.rot,
 			tint: entry.tint ?? defaultCharacterTint(entry, index),
@@ -3258,6 +3265,7 @@ export default function App() {
 				? (entry.id === activeId ? context.ikState : context.ikStates.get(entry.id))
 				: (entry.id === activeChar.id ? ikStateRef.current : ikStatesRef.current.get(entry.id));
 			poseMemberAtFrame(rigs[entry.id], clip, state, frame, IK_CORRECTION_BLEND_FRAMES);
+			applyVrmExpressions(rigs[entry.id], entry.expressions, frame / TIMELINE_FPS);
 		}
 		// The bones for this frame are now written, so a carried prop can take
 		// its place on them. gl.render() never runs the r3f frame loop, so this
@@ -3279,7 +3287,7 @@ export default function App() {
 	}
 
 	function snapshotExportRig(rig) {
-		return { rig, bones: snapshotPlaybackBones(rig), scale: rig.scale.clone(),
+		return { rig, expressions: snapshotVrmExpressions(rig), bones: snapshotPlaybackBones(rig), scale: rig.scale.clone(),
 			parent: rig.parent ? { node: rig.parent, position: rig.parent.position.clone(), quaternion: rig.parent.quaternion.clone() } : null };
 	}
 
@@ -3291,6 +3299,7 @@ export default function App() {
 			snapshot.parent.node.updateMatrixWorld(true);
 		}
 		restorePlaybackBones(snapshot.rig, snapshot.bones);
+		restoreVrmExpressions(snapshot.rig, snapshot.expressions);
 	}
 
 	// Restore at each synchronous capture boundary, including the depth
@@ -4027,6 +4036,8 @@ export default function App() {
 			editorCam: editorCamRef.current,
 			// QA-only: swap the active character's body ("x-bot-tpose" / "y-bot-tpose")
 			// or stature, so a browser QA run can check every shipped rig.
+			setFacialTracks: (id, expressions) => appContext.bus.run("character.set", { id, set: { expressions } }),
+			facialAtExportFrame: frame => withExportFrame(frame, () => Object.fromEntries(Object.entries(rigs).map(([id, rig]) => [id, snapshotVrmExpressions(rig)]))),
 			setCharacterModel: (id) => updateCharacterAt(activeCharIndex, { model: id }),
 			setPartColours: (enabled, mode = "shaded") => {
 				setPartColoursEnabled(!!enabled);
@@ -6398,6 +6409,17 @@ export default function App() {
 		const original = raw.characters.find(c => c.id === entity.id) ?? raw.characters.find(c => c.model === entity.model);
 		const target = original && raw.targets.get(original.id);
 		if (!target?.rig) throw new StudioProtocolError("TARGET_NOT_READY", "Character bounds require its loaded rig.");
+		if (target.rig.userData?.characterFormat === "vrm") {
+			const snapshot = snapshotPlaybackBones(target.rig);
+			try {
+				if (target.motion) applyMotionFrame(target.rig, target.motion, sampleAt({ frameCount: target.motion.frames, motion: target.motion }, null, frame).motionFrame);
+				target.rig.updateWorldMatrix(true, true);
+				const box = new THREE.Box3().setFromObject(target.rig, true);
+				const transform = c => new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.y ?? 0, c.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (c.rot ?? 0) * Math.PI / 180), new THREE.Vector3().setScalar(c.scale ?? 1));
+				box.applyMatrix4(transform(entity).multiply(transform(original).invert()));
+				return { min: { ...box.min }, max: { ...box.max } };
+			} finally { restorePlaybackBones(target.rig, snapshot); }
+		}
 		const rig = cloneSkeleton(target.rig), parent = new THREE.Group();
 		const originals = [], copies = [];
 		target.rig.traverse(node => originals.push(node)); rig.traverse(node => copies.push(node));
@@ -7193,6 +7215,7 @@ export default function App() {
 								<Character
 									key={`${view.id}:${rigMountEpoch}`}
 									url={view.url}
+									format={view.format}
 									position={view.position}
 									rot={view.rot}
 									tint={view.tint}
@@ -7780,6 +7803,7 @@ export default function App() {
 					    controls are on screen when this panel opens. */}
 					<CameraPanel isCameraSelection={isCameraSelection} shot={shot} moveSequence={moveSequence} cameraKeys={cameraKeys} activeShot={activeShot} changeShotTargetModel={changeShotTargetModel} />
 
+				<FacialExpressionsPanel hidden={!isCharacterSelection} character={activeChar} rig={activeRig} seconds={tlFrame / TIMELINE_FPS} duration={tlFrameCount / TIMELINE_FPS} onAgent={() => setStudioAgentMode(true)} />
 				<SubjectsPanel
 					isCharacterSelection={isCharacterSelection}
 					showB={showB}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ko } from "./locale.js";
-import { CHARACTER_MODEL_IDS } from "./scenes.js";
+import { CHARACTER_MODELS } from "./character-models.js";
 import { OBJECT_LIBRARY } from "./scene-objects.js";
 import { displayObjectGroupName, displayObjectLabel } from "./object-catalog.jsx";
 import { assetAspect, isMeshAssetId, isSupportedMeshType } from "./scene-assets.js";
@@ -10,10 +10,7 @@ import ResourceStatus from "./resource-status.jsx";
 
 /** Casting assets offered in the bottom Assets tab. `id` doubles as the FBX
  * file stem and the ARDY wire rig name (see scenes.js). */
-export const CHARACTER_ASSETS = CHARACTER_MODEL_IDS.map((id) => ({
-	id,
-	label: id === "y-bot-tpose" ? "Y Bot" : "X Bot",
-}));
+export const CHARACTER_ASSETS = [...CHARACTER_MODELS.filter(model => model.format === "vrm"), ...CHARACTER_MODELS.filter(model => model.format !== "vrm")];
 
 function CharacterPreview({ model }) {
 	const yBot = model === "y-bot-tpose";
@@ -384,7 +381,7 @@ export default function AssetPane({ onAssetGrab, imageAssetIds, meshAssetIds = n
 							>
 								<CharacterPreview model={asset.id} />
 								<span className="asset-card-label">{asset.label}</span>
-								<span className="asset-card-kind">{ko("Character", "인물")}</span>
+								<span className="asset-card-kind">{asset.format === "vrm" ? "VRM" : ko("Character", "인물")}</span>
 							</button>
 						))}
 					</div>

@@ -258,7 +258,11 @@ function liveToolsRuntime() {
 			liveHub.server?.once("close", () => removeLiveEndpoint(liveHub.port));
 		}
 		return { liveHub, handlers };
-	}).catch((error) => ({ error }));
+	}).catch((error) => {
+		console.error(`[agent] live editor connection failed: ${error.message}`);
+		if (error.code === "ERR_MODULE_NOT_FOUND") console.error("[agent] Install the live editor dependencies with npm ci --prefix mcp, then restart the dev server.");
+		return { error };
+	});
 }
 
 export function createAgentHandler({ auth = defaultAuth, codex, models, codexBaseUrl, cliproxyBaseUrl, env, fauxProvider, handlers, liveHub, port, studioRuntime, clock = Date.now, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, sessionStore: injectedSessionStore } = {}) {

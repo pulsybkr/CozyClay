@@ -100,6 +100,7 @@ function makeCase(entry) {
 	if (entry.normalizer === "createCharacterEntry") {
 		const input = { id: "char-test", model: "y-bot-tpose", layer: { waypoints: [], promptClips: [] }, motionRef: { url: "https://example.test/original.npz" } };
 		const field = entry.path.slice("character.".length);
+		if (field === "expressions") input.expressions = [{ expression: "happy", keys: [{ t: 0, weight: 0.5 }] }];
 		if (field === "tint") input.tint = "#a1b2c3";
 		if (field === "identityImage") input.identityImage = "data:image/png;base64,AAAA";
 		if (field === "pose") input.pose = { id: "pose-authored", label: "Authored", bones: { hips: [0, 0, 0, 1] } };
@@ -160,6 +161,7 @@ function makeCase(entry) {
 const expected = new Map([
 	["character.position", [1.25, 2.5, -3.75]],
 	["character.rot", 15],
+	["character.expressions", [{ expression: "happy", keys: [{ t: 0, weight: 0.5 }] }]],
 	["character.scale", 1.75],
 	["character.subject", "authored-test"],
 	["character.hidden", true],
@@ -220,7 +222,7 @@ const sample = {
 	image: () => "data:image/png;base64,AAAA",
 	vec3: () => ({ x: 1, y: 2, z: 3 }),
 	string: () => "sample text",
-	array: (entry) => (entry.path === "object.path"
+	array: (entry) => (entry.path === "character.expressions" ? [{ expression: "happy", keys: [{ t: 0, weight: 0.5 }] }] : entry.path === "object.path"
 		? { points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 1 }] }
 		: entry.path === "shot.cameraKeys"
 			? [{ frame: 4, framing: { pos: { x: 0, y: 1, z: 2 }, yaw: 0.1, pitch: -0.2, fovDeg: 40 } }]

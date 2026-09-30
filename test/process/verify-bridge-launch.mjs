@@ -156,7 +156,7 @@ function launcherSpec(kind, port, env) {
 }
 
 function launch(kind, port, env = {}) {
-	const spec = launcherSpec(kind, port, { ...process.env, ...env });
+	const spec = launcherSpec(kind, port, { ...process.env, CCLAY_KIMODO_API_URL: "", ...env });
 	const child = spawnOwned(process.execPath, spec.args, {
 		cwd: REPO,
 		env: spec.env,
@@ -166,7 +166,7 @@ function launch(kind, port, env = {}) {
 }
 
 function launchPackageNoMotion(port) {
-	const env = { ...process.env, CCLAY_MOTION_BACKEND: "kimodo" };
+	const env = { ...process.env, CCLAY_KIMODO_API_URL: "", CCLAY_MOTION_BACKEND: "kimodo" };
 	delete env.CCLAY_KIMODO_HOST;
 	delete env.COZYCLAY_BRIDGE_PORT;
 	delete env.COZYCLAY_BRIDGE_URL;
@@ -211,7 +211,7 @@ async function expectNoMotionDoesNotProxyForeignBridge() {
 
 async function expectViteProxyRequiresExplicitBridge() {
 	const script = "import config from './vite.config.js'; console.log(JSON.stringify(config.server?.proxy?.['/ardy']?.target ?? null));";
-	const withoutBridge = { ...process.env };
+	const withoutBridge = { ...process.env, CCLAY_KIMODO_API_URL: "" };
 	delete withoutBridge.COZYCLAY_BRIDGE_PORT;
 	delete withoutBridge.COZYCLAY_BRIDGE_URL;
 	const none = await execFileAsync(process.execPath, ["--input-type=module", "-e", script], { cwd: REPO, env: withoutBridge });
@@ -249,7 +249,7 @@ async function expectBridgeIpcReadiness() {
 	await close(reservation);
 	const child = fork(BRIDGE, [], {
 		cwd: REPO,
-		env: { ...process.env, CCLAY_MOTION_BACKEND: "kimodo", CCLAY_KIMODO_HOST: "test@kimodo", COZYCLAY_BRIDGE_PORT: String(port) },
+		env: { ...process.env, CCLAY_KIMODO_API_URL: "", CCLAY_MOTION_BACKEND: "kimodo", CCLAY_KIMODO_HOST: "test@kimodo", COZYCLAY_BRIDGE_PORT: String(port) },
 		stdio: ["ignore", "ignore", "ignore", "ipc"],
 		detached: true,
 	});
@@ -266,7 +266,7 @@ async function expectForeignListenerDoesNotReportBridgeReady() {
 	const port = await listen(foreign);
 	const child = fork(BRIDGE, [], {
 		cwd: REPO,
-		env: { ...process.env, CCLAY_MOTION_BACKEND: "kimodo", CCLAY_KIMODO_HOST: "test@kimodo", COZYCLAY_BRIDGE_PORT: String(port) },
+		env: { ...process.env, CCLAY_KIMODO_API_URL: "", CCLAY_MOTION_BACKEND: "kimodo", CCLAY_KIMODO_HOST: "test@kimodo", COZYCLAY_BRIDGE_PORT: String(port) },
 		stdio: ["ignore", "ignore", "ignore", "ipc"],
 		detached: true,
 	});
@@ -348,7 +348,7 @@ async function expectDevStartsWithoutKimodoHost() {
 	const reservation = createServer();
 	const port = await listen(reservation);
 	await close(reservation);
-	const env = { ...process.env };
+	const env = { ...process.env, CCLAY_KIMODO_API_URL: "" };
 	delete env.CCLAY_KIMODO_HOST;
 	const child = spawnOwned(process.execPath, ["tools/dev-full.mjs", "--host", "127.0.0.1", "--port", String(port)], {
 		cwd: REPO,

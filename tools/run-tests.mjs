@@ -14,6 +14,8 @@ if (!process.env.COZYCLAY_AGENT_SESSIONS_DIR) {
 }
 
 const NODE_FILES = [
+	"test/verify-vrm-project.mjs",
+	"test/verify-facial-expressions.mjs",
 	"test/verify-morphgs-exporter.mjs",
 	"test/verify-studio-elements.mjs",
 	"test/verify-studio-actions.mjs",
@@ -138,6 +140,7 @@ const NODE_FILES = [
 	"test/verify-kimodo-pose.mjs",
 	"test/verify-kimodo-preserve.mjs",
 	"test/verify-kimodo-runner.mjs",
+	"test/verify-kimodo-api.mjs",
 	"test/verify-kimodo-setup.mjs",
 	"test/verify-motion-trail.mjs",
 	"test/verify-kimodo-waypoints.mjs",
@@ -297,7 +300,7 @@ function verificationFiles(directory) {
 		.flatMap((entry) => {
 			const path = join(directory, entry.name);
 			if (entry.isDirectory()) return entry.name === "node_modules" ? [] : verificationFiles(path);
-			return entry.isFile() && /^verify(-.*)?\.mjs$/.test(entry.name) ? [relative(".", path)] : [];
+			return entry.isFile() && /^verify(-.*)?\.mjs$/.test(entry.name) ? [relative(".", path).replaceAll("\\", "/")] : [];
 		})
 		.sort();
 }

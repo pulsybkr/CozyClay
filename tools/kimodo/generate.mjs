@@ -40,6 +40,7 @@ import { buildEffectorConstraints } from "./effector-constraints.mjs";
 import { buildFullBodyConstraints } from "./pose-constraints.mjs";
 import { buildPreserveMask, preserveMaskStats, rootFreeMask, PRESERVE_MASK_VERSION_V2 } from "./preserve-mask.mjs";
 import { readKimodoMotion } from "./read-npz.mjs";
+import { createKimodoApiClient } from "./api-client.mjs";
 import { soma77ToCskel27Motion } from "./soma77-to-cskel27.mjs";
 import { writeLocalKimodoNpz } from "./local-output.mjs";
 
@@ -338,19 +339,22 @@ export async function generateOnBox({
 	spawnImpl = spawn,
 	onLine,
 } = {}) {
-	if (!host && backend === "nvidia-cuda") throw new Error("generateOnBox: CCLAY_KIMODO_HOST is required for nvidia-cuda");
-	if (!host && (segments?.length !== 1 || waypoints?.length || poses?.length || preserve)) {
+	const apiUrl = process.env.CCLAY_KIMODO_API_URL?.trim();
+	if (apiUrl && preserve) throw new Error("Kimodo API v2 does not expose partial preservation/inpainting");
+	if (!apiUrl && !host && backend === "nvidia-cuda") throw new Error("generateOnBox: CCLAY_KIMODO_HOST is required for nvidia-cuda");
+	if (!apiUrl && !host && (segments?.length !== 1 || waypoints?.length || poses?.length || preserve)) {
 		throw new Error(`${backend} local output supports a single unconstrained prompt only; sequencing, waypoints, poses and preserve require CUDA/SSH`);
 	}
-	const { prompt, duration } = joinPrompts(segments);
+	const { prompt, duration } = apiUrl ? { prompt: "", duration: "" } : joinPrompts(segments);
 
 	// Kimodo's own generation rate decides the constraint frame indices, and the
 	// clip length it will produce follows from the requested seconds. Both are
 	// known before the call, so the path can be translated up front.
 	const genFps = Number(process.env.CCLAY_KIMODO_GEN_FPS || 30);
-	if (!host && genFps !== 30) throw new Error(`${backend} local SOMA output requires CCLAY_KIMODO_GEN_FPS=30`);
+	if (!apiUrl && !host && genFps !== 30) throw new Error(`${backend} local SOMA output requires CCLAY_KIMODO_GEN_FPS=30`);
 	const requestedS = segments.reduce((total, segment) => total + Number(segment.duration), 0);
-	const genFrames = Math.max(1, Math.round(requestedS * genFps));
+	if (apiUrl && genFps !== 30) throw new Error("Kimodo API v2 integration requires generation at 30 fps");
+	const genFrames = apiUrl ? segments.reduce((sum, segment) => sum + Math.trunc(segment.duration * genFps), 0) : Math.max(1, Math.round(requestedS * genFps));
 	// Where each prompt segment begins, in GENERATION frames. Kimodo owns the
 	// first `transitionFrames` of every segment after the first, so constraints
 	// are kept clear of those windows.
@@ -414,6 +418,13 @@ export async function generateOnBox({
 		]
 		: buildFullBodyConstraints(poseEntries, { genFrames });
 	const constraints = [...root2d, ...posePins];
+
+	if (apiUrl) {
+		const { loaded, metadata } = await createKimodoApiClient().generate({ segments, constraints, diffusionSteps, seed, nativeOut, onLine });
+		const motion = soma77ToCskel27Motion({ frames: loaded.frames, fps: loaded.fps, globalRotMats: loaded.globalRotMats, posedJoints: loaded.posedJoints, jointNames: metadata.joint_names });
+		for (const warning of metadata.warnings ?? []) onLine?.(`kimodo-api warning: ${warning}`);
+		return { motion, raw: { frames: loaded.frames, joints: loaded.joints, fps: loaded.fps }, constraints, metrics: continuityMetrics(motion), metadata, preserve: null };
+	}
 
 	// --- scheduled inpainting plan (contracts C1/C3) --------------------------
 	// Built here and nowhere else: see the file header. Everything that reaches a

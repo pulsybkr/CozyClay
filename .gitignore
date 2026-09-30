@@ -27,3 +27,4 @@ mcp/node_modules/
 
 # agent scratch
 .omo/
+.env

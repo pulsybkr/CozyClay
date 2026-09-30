@@ -373,6 +373,7 @@ if (!existsSync(join(DIST, "app", "index.html"))) {
 // unconditionally would greet a first-time `npx cozyclay` with an error it
 // cannot act on. An unset CCLAY_KIMODO_HOST is the normal case, not a fault.
 const kimodoHost = process.env.CCLAY_KIMODO_HOST?.trim();
+const kimodoConfigured = kimodoHost || process.env.CCLAY_KIMODO_API_URL?.trim();
 let server = null;
 const startedAt = Date.now();
 let shuttingDown = false;
@@ -391,7 +392,7 @@ async function shutdown(exitCode = 0) {
 process.on("SIGINT", () => shutdown(130));
 process.on("SIGTERM", () => shutdown(143));
 
-if (opts.motion && kimodoHost && existsSync(BRIDGE)) {
+if (opts.motion && kimodoConfigured && existsSync(BRIDGE)) {
 	try {
 		({ child: bridge, port: bridgePort } = await startBridge({
 			command: process.execPath,
@@ -487,7 +488,7 @@ server = createServer((req, res) => {
 	// directory (cskel27-rest.json), and those files live in dist/, not behind
 	// the sidecar. Same rule as the Vite dev proxy bypass.
 	if (/^\/ardy\/(health|bases|generate|footage|extract|motions)(\/|$)/.test(url.pathname)) {
-		proxyToBridge(req, res, opts.motion && Boolean(kimodoHost));
+		proxyToBridge(req, res, opts.motion && Boolean(kimodoConfigured));
 		return;
 	}
 	let rel;
@@ -564,7 +565,7 @@ server.listen({ port: opts.port, host: "127.0.0.1", ipv6Only: false }, () => {
 	console.log(`CozyClay is running at ${url}`);
 	console.log("Use a Chromium-based browser — Safari and Firefox are not supported.");
 	if (!opts.motion) console.log("Motion generation: off (--no-motion).");
-	else if (bridge) console.log(`Motion generation: sidecar running against ${kimodoHost}.`);
+	else if (bridge) console.log(`Motion generation: sidecar running against ${process.env.CCLAY_KIMODO_API_URL ? "Kimodo HTTP API v2" : kimodoHost}.`);
 	else
 		console.log(
 			"Motion generation: off. It runs on an SSH-reachable NVIDIA machine with Kimodo;\n" +

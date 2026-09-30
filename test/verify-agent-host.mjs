@@ -214,6 +214,18 @@ if (runs("embedded-session-and-receipts")) {
 		expect("every minted session identity is distinct", createStudioSessionId() !== id);
 	});
 
+	await group("studio context failures remain actionable", async () => {
+		let requests = 0;
+		const store = createAgentChatStore({
+			transport: { turn: async () => { requests++; } }, surface: "studio",
+			buildContext: () => { throw new Error("The live editor is disconnected. Reconnect before sending."); },
+		});
+		await store.send("Create a scene");
+		expect("a disconnected editor does not submit a model request", requests === 0);
+		expect("the failure preserves the editor's connection diagnosis", items(store, "failure").at(-1)?.failure?.message.includes("live editor is disconnected"));
+		expect("a context failure does not leave the composer streaming", store.getState().streaming === false);
+	});
+
 	await group("studio send", async () => {
 		let revision = 41;
 		const sidecar = fakeSidecar({

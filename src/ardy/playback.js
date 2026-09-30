@@ -44,6 +44,7 @@ import { CSKEL27_JOINTS, CSKEL27_PARENTS } from "./cskel27.js";
 import { CSKEL27_NEUTRAL } from "./cskel27-neutral.js";
 import { globalRotations } from "./convert.js";
 import { normalizeBoneName } from "../poses.js";
+import { vrmRuntime, applyVrmMotionFrame, snapshotVrmBones, syncVrm } from "../vrm-runtime.js";
 
 /** cskel27 joint -> Mixamo bone name, mirroring the viser avatar's
  * _MIXAMO_TO_CORE (null = no bone is driven by this joint).
@@ -436,6 +437,7 @@ const desiredWorld = new Array(CSKEL27_JOINTS.length).fill(null);
  */
 export function applyMotionFrame(rig, motion, frame) {
 	if (!rig || !motion) return;
+	if (vrmRuntime(rig)) { applyVrmMotionFrame(rig, motion, frame); return; }
 	const f = Math.max(0, Math.min(Math.round(frame) || 0, motion.frames - 1));
 	const prep = prepOf(rig);
 	const joints = CSKEL27_JOINTS.length;
@@ -545,6 +547,7 @@ export function applyMotionFrame(rig, motion, frame) {
  * both) — so clearing a motion restores the prior CozyClay pose exactly.
  */
 export function snapshotPlaybackBones(rig) {
+	if (vrmRuntime(rig)) return snapshotVrmBones(rig);
 	const out = [];
 	const prep = prepOf(rig);
 	for (const bone of [...prep.bones, ...prep.stretchedLeaves.map((leaf) => leaf.bone)]) {
@@ -566,4 +569,5 @@ export function restorePlaybackBones(rig, snapshot) {
 		if (entry.length > 5) entry[0].position.set(entry[5], entry[6], entry[7]);
 	}
 	rig.updateMatrixWorld(true);
+	syncVrm(rig);
 }

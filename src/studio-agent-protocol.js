@@ -120,6 +120,7 @@ const promptBlock = object({ startFrame: integer(), endFrame: integer(1), text: 
 const cameraKey = object({ frame: integer(), framing: object({ pos: vec3, yaw: number(), pitch: number(), fovDeg: number(1, 179) }) }, { id });
 const objectRoute = nullable(object({ points: array(vec3, 64, 2) }, { speed: number(0, 50), faceTravel: bool, loop: bool, extend: bool }));
 const PATCH_VALUE_SCHEMAS = {
+	"character.expressions": array(object({ expression: text(128), keys: array(object({ t: number(0, 3600), weight: number(0, 1) }), 512, 1) }), 64),
 	"character.pose": nullable(id), "character.identityImage": nullable(dataImage), "character.promptBlocks": array(promptBlock, 64),
 	"object.parent": nullable(id), "object.path": objectRoute, "stage.environmentImage": nullable(dataImage),
 	"shot.cameraKeys": array(cameraKey, 64), "shot.targetModel": nullable(id),

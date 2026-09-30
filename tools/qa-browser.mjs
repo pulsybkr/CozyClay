@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
 	installSignalCleanup,
 	spawnOwned,
@@ -100,11 +100,23 @@ try {
 	const profileDir = mkdtempSync(join(tmpdir(), "cozyclay-qa-"));
 const children = [];
 let removeSignalCleanup = () => {};
-const cleanupProfile = () => rmSync(profileDir, { recursive: true, force: true });
+const cleanupProfile = () => {
+	const target = resolve(profileDir);
+	if (dirname(target) !== resolve(tmpdir()) || !basename(target).startsWith("cozyclay-qa-")) {
+		throw new Error("Refusing to remove a QA profile outside the temporary directory");
+	}
+	// Windows Chrome subprocesses can briefly retain the spelling dictionary.
+	try { rmSync(target, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 }); }
+	catch (error) {
+		if (process.platform !== "win32" || !["EBUSY", "EPERM"].includes(error.code)) throw error;
+		console.warn(`[qa] Chrome still holds its temporary profile; retained at ${target}`);
+	}
+};
 
 try {
 	const chrome = spawnOwned(chromePath, [
 		"--headless=new",
+		...(process.env.QA_SOFTWARE_GL === "1" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-extensions"] : []),
 		`--remote-debugging-port=${port}`,
 		`--user-data-dir=${profileDir}`,
 		`--window-size=${process.env.QA_WINDOW || "1600,1000"}`,

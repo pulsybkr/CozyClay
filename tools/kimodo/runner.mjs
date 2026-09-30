@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { createKimodoApiClient } from "./api-client.mjs";
 import { KIMODO_BACKENDS } from "./generate.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -90,6 +91,8 @@ function unsupported(feature) {
 
 export function createKimodoRunner() {
 	const HOST = process.env.CCLAY_KIMODO_HOST || "";
+	const API_URL = process.env.CCLAY_KIMODO_API_URL?.trim();
+	if (API_URL) createKimodoApiClient();
 	let installed = {};
 	try { installed = JSON.parse(readFileSync(process.env.CCLAY_KIMODO_BACKEND_FILE || `${process.env.HOME || ""}/.cozyclay/kimodo-backend.json`, "utf8")); } catch {}
 	const BACKEND = process.env.CCLAY_KIMODO_BACKEND || installed.backend || "nvidia-cuda";
@@ -99,7 +102,7 @@ export function createKimodoRunner() {
 	const TEXT = process.env.CCLAY_KIMODO_MLX_TEXT || process.env.CCLAY_KIMODO_CPP_TEXT_BUNDLE || installed.text || "";
 	const TARGET_FPS = Number(process.env.CCLAY_KIMODO_TARGET_FPS || 24);
 
-	if (!HOST && BACKEND === "nvidia-cuda") {
+	if (!API_URL && !HOST && BACKEND === "nvidia-cuda") {
 		throw new Error("CCLAY_KIMODO_HOST is required for the Kimodo backend (for example: user@gpu-box)");
 	}
 
@@ -119,6 +122,11 @@ export function createKimodoRunner() {
 	}
 
 	async function probeHealth() {
+		if (API_URL) {
+			const value = await createKimodoApiClient().capabilities();
+			if (value.api_version !== "2" || value.fps !== 30) throw new Error("Unsupported Kimodo API contract");
+			return { ok: true, backend: "http_kimodo", host_configured: true, encoder: "remote", device: "remote", capabilities: { lineEdit: false } };
+		}
 		if (!HOST) {
 			// A selected local route is not end-to-end ready merely because its
 			// wrapper is installed. Generation also needs both model artifacts.
@@ -189,6 +197,7 @@ export function createKimodoRunner() {
 	// than generated whole, or it predates scheduled inpainting. The bridge
 	// degrades to a plain generation and says so on the status stream.
 	function baseMotionFor(motionPath) {
+		if (API_URL) return null;
 		const native = nativeMotionPath(motionPath);
 		return existsSync(native) ? native : null;
 	}
@@ -273,7 +282,7 @@ export function createKimodoRunner() {
 
 	return {
 		mode: "kimodo",
-		describe: () => `${HOST ? `box ${HOST}` : "local"} (${BACKEND}, repo ${REPO}, model ${MODEL}, retimed to ${TARGET_FPS} fps${HOST ? "" : ", single unconstrained SOMA30 prompt to Studio NPZ"})`,
+		describe: () => API_URL ? `Kimodo HTTP API v2 (retimed to ${TARGET_FPS} fps)` : `${HOST ? `box ${HOST}` : "local"} (${BACKEND}, repo ${REPO}, model ${MODEL}, retimed to ${TARGET_FPS} fps${HOST ? "" : ", single unconstrained SOMA30 prompt to Studio NPZ"})`,
 		probeHealth,
 		listBases,
 		baseMotionFor,

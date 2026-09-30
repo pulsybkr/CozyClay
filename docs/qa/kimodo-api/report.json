@@ -1,0 +1,16 @@
+{
+  "sourceFrames": 60,
+  "sourceFps": 30,
+  "studioFrames": 48,
+  "studioFps": 24,
+  "finite": true,
+  "postprocess": true,
+  "skeleton": "SOMASkeleton77",
+  "seed": 42,
+  "warnings": [],
+  "continuity": {
+    "mean_jump_m": 0.001102478354003637,
+    "max_jump_m": 0.002639312063127635,
+    "max_jump_frame": 49
+  }
+}

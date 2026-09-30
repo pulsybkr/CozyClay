@@ -103,7 +103,7 @@ try {
 		onLine: (line) => console.log(line),
 	});
 
-	const sourceFps = Math.round(raw.frames / durationS);
+	const sourceFps = raw.fps ?? Math.round(raw.frames / durationS);
 	const retimed = retimeMotion({ ...motion, fps: sourceFps }, source.fps);
 
 	// Keep ONLY the edited span; everything else stays the author's take.

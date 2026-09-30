@@ -1,0 +1,19 @@
+{
+  "initial": {
+    "meshes": 112,
+    "textures": 121,
+    "hips": true,
+    "scale": 1,
+    "models": [
+      "sakura-vrm",
+      "char-02-vrm"
+    ]
+  },
+  "playback": {
+    "independent": true,
+    "finite": true,
+    "changed": true,
+    "seek": true,
+    "restored": true
+  }
+}

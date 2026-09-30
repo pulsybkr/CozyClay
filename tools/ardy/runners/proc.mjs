@@ -19,6 +19,16 @@ export function track(child) {
 }
 
 export function killGroup(child) {
+	if (child.cozyKimodoApi) {
+		// Give the HTTP wrapper time to cancel the remote GPU job before exiting.
+		try { child.stdin?.write("cozyclay:cancel\n"); } catch {}
+		const timer = setTimeout(() => {
+			if (child.exitCode !== null || child.signalCode !== null) return;
+			try { if (process.platform === "win32") child.kill("SIGKILL"); else process.kill(-child.pid, "SIGKILL"); } catch {}
+		}, 15000);
+		timer.unref();
+		return;
+	}
 	try {
 		process.kill(-child.pid, "SIGTERM");
 	} catch {

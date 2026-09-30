@@ -3,6 +3,8 @@
 // React or any persistence implementation. Fields use generic set/read;
 // lifecycle and composite elements name the commands that own them.
 
+import { CHARACTER_MODEL_IDS } from "./character-models.js";
+
 const freezeBounds = (bounds) => bounds && typeof bounds === "object"
 	? Object.freeze({ ...bounds })
 	: bounds;
@@ -22,9 +24,10 @@ const entries = [
 	{ path: "character.scale", type: "number", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", min: 0.2, max: 3 },
 	{ path: "character.subject", type: "string", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry" },
 	{ path: "character.hidden", type: "boolean", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry" },
-	{ path: "character.model", type: "enum", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", enum: ["y-bot-tpose", "x-bot-tpose"] },
+	{ path: "character.model", type: "enum", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", enum: CHARACTER_MODEL_IDS },
 	{ path: "character.tint", type: "color", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry" },
 	{ path: "character.identityImage", type: "image", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", note: "data:image only" },
+	{ path: "character.expressions", type: "array", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", note: "Facial tracks in scene seconds; independent of body animation" },
 	{ path: "character.pose", type: "id", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry" },
 	{ path: "character.waypoints", type: "array", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", actions: ["character.addWaypoint", "character.moveWaypoint", "character.removeWaypoint", "character.clearWaypoints"], note: "root path pins, addressed by frame" },
 	{ path: "character.promptBlocks", type: "array", persisted: true, undoDomain: "cast", normalizer: "createCharacterEntry", note: "stored at layer.promptClips" },

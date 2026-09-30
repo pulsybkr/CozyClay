@@ -1,3 +1,5 @@
+import { supportedVrmExpressions } from "../vrm-runtime.js";
+import { validateExpressionTracks } from "../facial-expressions.js";
 import { copyPhysicsKeys } from "../ardy/physics-review.js";
 import { useState, useMemo, useEffect, useSyncExternalStore, useContext } from "react";
 import { AppContext } from '../app-context.js';
@@ -13,6 +15,7 @@ import {
 	saveCustomPoses,
 } from "../poses.js";
 import { createCharacterEntry, createCharacterLayer } from "../scenes.js";
+import { isVrmModel } from "../character-models.js";
 import {
 	DEFAULT_SUBJECT,
 	DEFAULT_SUBJECT2,
@@ -61,6 +64,10 @@ export function createCastDomain(appContext, initial, customPoses = []) {
 		const before = state();
 		const after = documentStore.write('cast', before => {
 			const next = normalize(typeof update === 'function' ? update(before) : update);
+			if (!loading) for (const entry of next.characters) {
+				const old = before.characters.find(row => row.id === entry.id);
+				if (entry.expressions?.length && old?.model === entry.model && !sameCastValue(old.expressions, entry.expressions)) domain.validateExpressions?.(entry);
+			}
 			return sameCastValue(before, next) ? before : next;
 		});
 		if (after !== before) {
@@ -159,6 +166,12 @@ export function useCast(appContext) {
 	const [studioPick, setStudioPick] = useState(null);
 
 	const [rigs, setRigs] = useState({});
+	domain.validateExpressions = entry => {
+		if (!isVrmModel(entry.model)) throw new StudioProtocolError("INVALID_ARGUMENT", "Facial tracks require a VRM avatar.");
+		if (!rigs[entry.id]) throw new StudioProtocolError("TARGET_NOT_READY", "Wait for the avatar to load before editing facial tracks.");
+		try { validateExpressionTracks(entry.expressions, supportedVrmExpressions(rigs[entry.id]).map(item => item.name)); }
+		catch (error) { throw new StudioProtocolError("INVALID_ARGUMENT", error.message); }
+	};
 
 	const [rigMountEpoch, setRigMountEpoch] = useState(0);
 
@@ -243,6 +256,10 @@ export function useCast(appContext) {
 		if (!appContext.shared.rigReportersRef.current.has(charId)) {
 			appContext.shared.rigReportersRef.current.set(charId, (rig) => {
 				setRigs((current) => (current[charId] === rig ? current : { ...current, [charId]: rig }));
+				if (!rig) {
+					window.__cozyclayMcpRigReady = (window.__cozyclayMcpRigReady ?? []).filter(id => id !== charId);
+					return;
+				}
 				window.__cozyclayMcpRigReady = [...new Set([...(window.__cozyclayMcpRigReady ?? []), charId])];
 				window.dispatchEvent(new CustomEvent("cozyclay:mcp-rig-ready", { detail: charId }));
 				const waiter = appContext.shared.rigWaitersRef.current.get(charId);
@@ -640,6 +657,10 @@ export function useCast(appContext) {
 	}
 
 	function openStudio(charId) {
+		if (isVrmModel(domain.read().find(entry => entry.id === charId)?.model)) {
+			appContext.notify(ko("Advanced pose editing is not available for VRM yet.", "VRM 고급 포즈 편집은 아직 지원되지 않습니다."));
+			return;
+		}
 		setPosing(charId);
 		setPosingClosing(false);
 		const entry = characters.find((item) => item.id === charId);

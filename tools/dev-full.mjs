@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { handleOAuthRequest } from "../bin/codex-auth.mjs";
 import { createAgentHandler } from "../bin/agent/agent-routes.mjs";
@@ -14,6 +15,7 @@ import {
 } from "./process-supervisor.mjs";
 
 const REPO = resolve(fileURLToPath(new URL("..", import.meta.url)));
+if (existsSync(resolve(REPO, ".env"))) process.loadEnvFile(resolve(REPO, ".env"));
 const viteArgs = [...process.argv.slice(2), "--strictPort"];
 
 function mainPortFrom(args) {
@@ -61,7 +63,7 @@ const untrackChild = (child) => children.splice(children.indexOf(child), 1);
 const kimodoHost = process.env.CCLAY_KIMODO_HOST?.trim();
 let bridge;
 let bridgePort;
-if (kimodoHost) {
+if (kimodoHost || process.env.CCLAY_KIMODO_API_URL?.trim()) {
 	try {
 		({ child: bridge, port: bridgePort } = await startBridge({
 			command: process.execPath,

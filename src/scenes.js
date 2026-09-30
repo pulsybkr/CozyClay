@@ -1,3 +1,4 @@
+import { validateExpressionTracks } from "./facial-expressions.js";
 // Pure multi-scene document model. No three.js, no React.
 // A Scene is the set; shotDocument and stage are sealed department envelopes.
 // This module stores and copies those envelopes but never opens or validates them.
@@ -7,6 +8,8 @@ import { normalizeStableItems } from "./stable-items.js";
 import { normalizeMotionCalibration } from "./ardy/motion-calibration.js";
 import { elementByPath } from "./studio-elements.js";
 import { wrapAngle } from "./scene-objects.js";
+import { CHARACTER_MODEL_IDS } from "./character-models.js";
+export { CHARACTER_MODEL_IDS } from "./character-models.js";
 
 const CHARACTER_POSITION_LIMITS = elementByPath("character.position");
 const CHARACTER_ROTATION_LIMITS = elementByPath("character.rot");
@@ -39,7 +42,6 @@ export const toTimelineFrame = (frame) =>
 
 /** Rigged character models shipped in public/models. The id is both the FBX
  * file stem and the wire `source.rig` value sent to ARDY. */
-export const CHARACTER_MODEL_IDS = Object.freeze(["y-bot-tpose", "x-bot-tpose"]);
 export const DEFAULT_CHARACTER_MODEL = "y-bot-tpose";
 export const DEFAULT_SUBJECT_ONE = "a young woman in a tan coat";
 export const DEFAULT_SUBJECT_TWO = "a man in a dark coat";
@@ -183,6 +185,7 @@ export function createCharacterEntry(source = null, index = 0) {
 		// re-fetch and decode it on the next session.
 		layer: normalizeLayer(s.layer),
 		motionRef: normalizeMotionRef(s.motionRef),
+		...(s.expressions !== undefined ? { expressions: validateExpressionTracks(s.expressions) } : {}),
 	};
 }
 

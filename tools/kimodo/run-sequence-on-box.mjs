@@ -134,7 +134,7 @@ try {
 
 	// Kimodo's npz carries no fps member, so the real rate is recovered from the
 	// frame count against the duration that was actually asked for.
-	const sourceFps = Math.round(raw.frames / requestedS);
+	const sourceFps = raw.fps ?? Math.round(raw.frames / requestedS);
 	if (!Number.isFinite(sourceFps) || sourceFps < 1) {
 		throw new Error(`could not infer source fps from ${raw.frames} frames over ${requestedS}s`);
 	}

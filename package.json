@@ -79,6 +79,7 @@
   },
   "devDependencies": {
     "@mediapipe/tasks-vision": "0.10.17",
+    "@pixiv/three-vrm": "^3.4.4",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.7.0",
     "@vitejs/plugin-react": "^6.0.5",

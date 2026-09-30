@@ -1398,7 +1398,12 @@ export function createAgentChatStore({
 			if (!trimmed || state.streaming) return;
 			const turnId = newId();
 			// Context is read at Send, from the host's current authoritative refs.
-			const context = studio ? buildContext?.() ?? null : null;
+			let context = null;
+			try { context = studio ? buildContext?.() ?? null : null; }
+			catch (error) {
+				applyEvent({ type: "error", code: "upstream", message: String(error?.message || error) });
+				return;
+			}
 			if (studio && !context) {
 				applyEvent({ type: "error", code: "upstream", message: "The editor is not ready to describe the scene yet." });
 				return;

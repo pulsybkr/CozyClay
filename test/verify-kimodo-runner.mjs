@@ -194,7 +194,7 @@ try {
 		const spawnImpl = (command, args, options) => {
 			assert.equal(options.cwd, "/fixture repo");
 			if (backend === "kimodo-mlx") {
-				assert.equal(command, `${process.env.HOME}/.cozyclay/kimodo-mlx-venv/bin/python`);
+				assert.equal(command, `${process.env.HOME || ""}/.cozyclay/kimodo-mlx-venv/bin/python`);
 				assert.equal(args[0], fileURLToPath(new URL("../tools/kimodo/mlx-generate.py", import.meta.url)));
 				assert.equal(args[args.indexOf("--prompt") + 1], "A person walks.");
 				assert.equal(args[args.indexOf("--frames") + 1], "2");

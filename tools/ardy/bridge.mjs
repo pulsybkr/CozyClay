@@ -1023,6 +1023,7 @@ async function handleGenerate(req, res) {
 	const children = new Set();
 	const spawnTracked = (command, args, options) => {
 		const child = spawn(command, args, options);
+		child.cozyKimodoApi = Boolean(options?.env?.CCLAY_KIMODO_API_URL && /run-(sequence|edit)-on-box\.mjs$/.test(args[0] ?? ""));
 		children.add(child);
 		track(child);
 		return child;

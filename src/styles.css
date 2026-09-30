@@ -3095,6 +3095,37 @@ input[type=range]::-moz-range-thumb {
 	border-radius: 13px;
 	padding: 12px 13px 13px;
 }
+
+.subject-model-field {
+	display: grid;
+	gap: 6px;
+	margin-top: 10px;
+	font-size: 11px;
+	color: var(--muted);
+}
+.subject-model-field select {
+	width: 100%;
+	min-width: 0;
+	padding: 7px 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--card);
+	color: var(--text);
+}
+.subject-model-note {
+	margin: 8px 0 0;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--muted);
+}
+.vrm-load-status {
+	width: 180px;
+	padding: 10px;
+	border-radius: 6px;
+	background: var(--card);
+	color: var(--text);
+	font-size: 12px;
+}
 .subject-box.new {
 	animation: subjectIn .42s var(--spring) both;
 	transform-origin: right center;
@@ -11510,3 +11541,20 @@ input[type=range] {
 .result-motion-video { width: 100%; max-height: 420px; background: #090b10; }
 .result-motion-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: var(--muted, #a7afc2); font-size: 11px; }
 .result-motion-meta span { padding: 3px 6px; border: 1px solid var(--line, #313747); border-radius: 999px; }
+
+.facial-editor { display: grid; gap: 9px; }
+.facial-editor label { display: grid; gap: 4px; }
+.facial-editor select, .facial-editor input, .facial-editor textarea { width: 100%; box-sizing: border-box; }
+.facial-editor textarea { min-height: 70px; resize: vertical; }
+.facial-track { display: grid; gap: 5px; border-top: 1px solid var(--border, #444); padding-top: 8px; }
+.facial-track > div { display: flex; justify-content: space-between; align-items: center; }
+
+.facial-editor { font-size: 12px; }
+.facial-editor select, .facial-editor input, .facial-editor textarea, .facial-editor button { border: 1px solid var(--line2, #474747); border-radius: 4px; background: var(--card2, #252525); color: var(--fg, #e2e2e2); font: inherit; padding: 6px 8px; }
+.facial-editor button { cursor: pointer; }
+.facial-editor button:hover:not(:disabled) { border-color: var(--accent, #54a5df); }
+.facial-editor button:disabled { opacity: .45; cursor: default; }
+.facial-editor select:focus-visible, .facial-editor input:focus-visible, .facial-editor textarea:focus-visible, .facial-editor button:focus-visible { outline: 2px solid var(--accent, #54a5df); outline-offset: 1px; }
+.facial-track strong { font-size: 11px; font-weight: 600; }
+.facial-track > div button { padding: 2px 7px; }
+.facial-editor [role="alert"] { color: #efb580; }

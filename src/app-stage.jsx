@@ -57,6 +57,8 @@ import { RENDER_ACTIVITY_EVENT } from "./use-render-activity.js";
 import { CUSTOM_MOVE, SHOT_ASPECT_RATIOS, SUBJECT_HEIGHT_M } from "./shot.js";
 import { sampleAt } from "./sample-at.js";
 import { shotAtFrame } from "./cuts.js";
+import VrmCharacter from "./vrm-character.jsx";
+export { characterModelUrl } from "./character-model-urls.js";
 
 // Stated the way a crew states a setup: how far back, which side, how high the
 // lens rides, and what glass is on it. Order matters — Medium is the setup a
@@ -460,7 +462,6 @@ export const SHOT_ASPECT_PRESETS = Object.freeze({
 // Per-character rig model: the stage entry's `model` is the FBX file stem in
 // public/models AND the wire rig name sent to ARDY, so mesh and export can
 // never drift apart.
-export const characterModelUrl = (model) => `/models/${model}.fbx`;
 
 /** Shipped rig names as the operator says them, not as the files spell them. */
 export const CHARACTER_MODEL_LABELS = { "y-bot-tpose": "Y Bot", "x-bot-tpose": "X Bot" };
@@ -800,7 +801,7 @@ export const MULTIMODEL_SAMPLE_FPS = TIMELINE_FPS;
 /* ------------------------------------------------------------------ 3D --- */
 
 // Memoized: unchanged cast members skip re-rendering on every playhead tick.
-export const Character = memo(function Character({ url, position, rot, tint, pose, scale = 1, onRig, pickId, partColoursEnabled = false, partColoursMode = "shaded" }) {
+const FbxCharacter = memo(function FbxCharacter({ url, position, rot, tint, pose, scale = 1, onRig, pickId, partColoursEnabled = false, partColoursMode = "shaded" }) {
 	const fbx = useFBX(url);
 	const model = useMemo(() => {
 		const clone = SkeletonUtils.clone(fbx);
@@ -883,6 +884,10 @@ export const Character = memo(function Character({ url, position, rot, tint, pos
 			<primitive object={model} />
 		</group>
 	);
+});
+
+export const Character = memo(function Character(props) {
+	return props.format === "vrm" ? <VrmCharacter {...props} /> : <FbxCharacter {...props} />;
 });
 
 /** Selection marker for the picked cast member: a Unity-style XYZ tripod

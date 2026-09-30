@@ -3,6 +3,7 @@ import { ko } from "../locale.js";
 import { defaultCharacterTint } from "../app-stage.jsx";
 import SubjectBox from "./SubjectBox.jsx";
 import { useCastTransaction } from '../domains/cast.js';
+import { isVrmModel } from '../character-models.js';
 
 export default function SubjectsPanel({
 	isCharacterSelection, showB, characters, openStudio, posing,
@@ -17,14 +18,14 @@ export default function SubjectsPanel({
 									label={ko(`Subject ${index + 1}`, `인물 ${index + 1}`)}
 									value={entry}
 									onChange={(patch) => run('character.update', { characterId: entry.id, patch })}
-									onPose={() => openStudio(entry.id)}
+									onPose={isVrmModel(entry.model) ? undefined : () => openStudio(entry.id)}
 									posing={posing === entry.id}
 									onRemove={index > 0 ? () => run('character.remove', { characterId: entry.id }) : undefined}
 									color={entry.tint ?? defaultCharacterTint(entry, index)}
 									/* A colour picker streams values while it is open, so the
 									   whole picking session is one Ctrl+Z entry. */
 									onColorEditStart={begin}
-									onColorChange={(tint) => run('character.update', { characterId: entry.id, patch: { tint } })}
+									onColorChange={isVrmModel(entry.model) ? undefined : (tint) => run('character.update', { characterId: entry.id, patch: { tint } })}
 								/>
 							))}
 						</div>
