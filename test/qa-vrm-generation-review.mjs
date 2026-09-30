@@ -19,6 +19,15 @@ async function until(expression) {
   }
 }
 try {
+  // Readiness belongs to the same deterministic fixture as generation, so a
+  // real bridge health timeout cannot influence this installation regression.
+  await b.send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{
+    const fetchReal=window.fetch.bind(window);
+    window.fetch=(url,options)=>url==='/ardy/health'
+      ? Promise.resolve(new Response(JSON.stringify({ok:true,backend:'http_kimodo',host_configured:true,device:'remote'}),{headers:{'Content-Type':'application/json'}}))
+      : fetchReal(url,options);
+  })()`});
+  await b.navigate(new URL('/app/',b.base));
   await until('!!window.__cozyclayProject && !!window.__cozyclay?.rigA');
   await b.evaluate("(async()=>window.__cozyclayProject.open(await(await fetch('/scenes/vrm-dialogue.cclayproject')).text()))()");
   await until("window.__cozyclay?.rigA?.userData.characterFormat==='vrm' && window.__cozyclayMcpRigReady?.includes('char-b') && !!document.querySelector('.live-workspace-handle')");
@@ -50,6 +59,10 @@ try {
     assert.equal(receipt.ok,true,JSON.stringify(receipt));
     return receipt;
   };
+  // Removing a loaded character leaves a null rig slot in the renderer registry.
+  // It must not break the snapshot at the next motion.generate boundary.
+  await action('character.remove',{characterId:'char-b'});
+  await until("!window.__cozyclayMcpRigReady?.includes('char-b')");
   const started=await action('motion.generate',{characterId:'char-a',durationSeconds:2,seed:42,
     blocks:[{id:'qa',text:'Walk then wave',startFrame:0,endFrame:48}]});
   const completed=started.status==='started' ? await action('job.await',{jobId:started.jobId,timeoutMs:60000}) : started;

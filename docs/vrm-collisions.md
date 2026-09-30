@@ -69,6 +69,9 @@ installation d’un artefact réutilisé, rapport automatique à l’agent, corr
 d’une animation existante et annulation par l’historique, sans nouvel appel GPU.
 Il vérifie également que les 48 clés du mouvement de test survivent à une
 sauvegarde puis à la réouverture du fichier projet.
+Une régression supprime un personnage VRM chargé avant la génération : les
+références de squelettes à `null` doivent être ignorées lors des snapshots, pour
+éviter l’erreur `Cannot read properties of null (reading 'userData')`.
 
 Pour lancer ces QA, fournir un artefact CozyClay NPZ déjà généré avec
 `QA_KIMODO_NPZ`, l’URL du studio avec `QA_URL` et le port du hub avec

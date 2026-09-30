@@ -162,7 +162,9 @@ export function createMotionDomain(appContext, characters) {
 	const frame = () => appContext.live.state?.timeline.currentFrame ?? 0;
 	const rigFor = id => appContext.shared.rigs[id];
 	function rigSnapshots() {
-		return new Map(Object.entries(appContext.shared.rigs).map(([id, rig]) => [id, appContext.shared.snapshotExportRig(rig)]));
+		// Removed or remounting characters publish null until their rig loads.
+		return new Map(Object.entries(appContext.shared.rigs).filter(([, rig]) => Boolean(rig))
+			.map(([id, rig]) => [id, appContext.shared.snapshotExportRig(rig)]));
 	}
 	let publishedIds = new Set();
 	function project() {

@@ -3,6 +3,18 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { motionFixture, seedMotion } from './motion-fixture.mjs';
 const ok = value => { assert.equal(value.ok, true, JSON.stringify(value)); return value; };
+test('motion: removed and remounting rigs do not break action snapshots', () => {
+  const f = motionFixture();
+  try {
+    f.motion.load([{ id: 'actor-a', take: seedMotion() }]);
+    f.rigs['removed-character'] = null;
+    f.rigs['loading-character'] = null;
+    const before = f.snapshot();
+    const receipt = ok(f.run('motion.fixCollisions', { characterId: 'actor-a', scope: 'clip' }));
+    assert.match(receipt.summary, /Reviewed/);
+    if (receipt.undo) { f.actual.undoScene(); assert.deepEqual(f.snapshot(), before); }
+  } finally { delete f.rigs['removed-character']; delete f.rigs['loading-character']; f.dispose(); }
+});
 test('motion: the shipped IK drag handler records the pre-drag rig, not its already-dragged pose', () => {
   const f = motionFixture();
   try {
