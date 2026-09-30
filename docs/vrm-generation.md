@@ -17,7 +17,7 @@ Actions disponibles :
 - `vrm.jobs` : historique local, identifiants Atelier, progression et résultat de l’import.
 - `vrm.status` : état actuel d’un job auprès d’Atelier.
 
-Une commande peut répondre `started` avec un identifiant de job **CozyClay** : `job.await` attend sa réception finale. `vrm.jobs` donne l’identifiant **Atelier** nécessaire à une reprise. L’import terminé est annulable avec sa réception. Les demandes de plusieurs avatars se font successivement ; elles ne consomment pas la limite des générations de mouvements corporels.
+Le branchement de l’agent attend automatiquement la réception finale de l’import VRM. Un appel brut à l’éditeur peut répondre `started` avec un UUID de job **CozyClay** : seul `job.await` doit recevoir ce UUID. `vrm.jobs` donne l’identifiant **Atelier**, commençant par `job_`, nécessaire à `vrm.status` et à une reprise. Un UUID CozyClay est refusé avant tout appel HTTP vers Atelier. L’import terminé est annulable avec sa réception. Les demandes de plusieurs avatars se font successivement ; elles ne consomment pas la limite des générations de mouvements corporels.
 
 ## Configuration
 

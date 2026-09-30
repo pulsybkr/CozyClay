@@ -3,7 +3,7 @@ import {createStableItemId} from '../stable-items.js';
 import {fail} from './shared.js';
 import {createCharacterEntry} from '../scenes.js';
 const text=max=>({type:'string',minLength:1,maxLength:max});
-const jobId={...text(128),pattern:'^[A-Za-z0-9][A-Za-z0-9_-]*$'};
+const jobId={...text(128),pattern:'^job_[A-Za-z0-9_-]+$',description:'External Atelier ID, starting with job_. Never pass the CozyClay UUID from a started receipt here; that UUID is awaited with job.await.'};
 const placement={type:'object',properties:{x:{type:'number',minimum:-240,maximum:240},z:{type:'number',minimum:-240,maximum:240},rot:{type:'number',minimum:-180,maximum:180}},required:[],additionalProperties:false};
 const input=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const declarations=Object.freeze([

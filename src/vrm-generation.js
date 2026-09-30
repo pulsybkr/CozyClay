@@ -13,9 +13,9 @@ function update(jobId,patch) {
   try {localStorage.setItem(storageKey,JSON.stringify(jobs));}catch {}
   for(const listener of listeners)listener();
 }
-export function validJobId(id){return typeof id==='string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id);}
+export function validJobId(id){return typeof id==='string' && /^job_[A-Za-z0-9_-]{1,124}$/.test(id);}
 const error=(code,message)=>Object.assign(new Error(message),{code});
-const route=id=>{if(!validJobId(id))throw error('INVALID_ARGUMENT','Invalid VRM job ID.');return `/api/v1/jobs/${encodeURIComponent(id)}`;};
+const route=id=>{if(!validJobId(id))throw error('INVALID_ARGUMENT','Atelier requires its external job_… ID. A CozyClay receipt UUID must be awaited with job.await, never sent to the Atelier API. Read vrm.jobs to find the external ID.');return `/api/v1/jobs/${encodeURIComponent(id)}`;};
 async function json(path,options={}) {
   let response;
   try {response=await fetch(`${apiBase.replace(/\/$/,'')}${path}`,{...options,signal:options.signal ? AbortSignal.any([options.signal,AbortSignal.timeout(45000)]) : AbortSignal.timeout(45000)});}

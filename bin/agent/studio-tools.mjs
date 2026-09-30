@@ -26,6 +26,7 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
     if (name === 'generate_motion' && command.args.source.kind === 'generate') return invoke('run_action', { action: 'motion.generate', args: generationArgs(command.args) });
     const action = name === "run_action" ? declared.get(command.args.action) : undefined;
     const generation = action?.generation === "motion";
+    const vrmGeneration = name === 'run_action' && ['character.generateVrm','character.importVrmJob'].includes(command.args.action);
     if (generation && (generationGate.used || generationGate.pending)) throw new StudioProtocolError("GENERATION_LIMIT", "One motion generation per user message. Report this result and ask the user before generating again.");
     if (generation && (generationGate.failures ?? 0) >= 2) throw new StudioProtocolError("GENERATION_LIMIT", "Two motion generation attempts already failed in this user message. Report both failures to the user and ask before generating again.");
     const payload = mutationNames.has(name) && session?.admission
@@ -37,10 +38,19 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
     try {
       // A motion check samples the whole take in the editor, minutes on a long
       // take, so it waits under the hub ceiling rather than the Studio default.
-      const timeoutMs = name === "run_action" ? (action?.timeoutMs === undefined ? undefined : Math.min(MAX_COMMAND_TIMEOUT_MS, action.timeoutMs + (generation ? 5000 : 0)))
+      const timeoutMs = name === "run_action" ? (action?.timeoutMs === undefined ? undefined : Math.min(MAX_COMMAND_TIMEOUT_MS, action.timeoutMs + (generation || vrmGeneration ? 5000 : 0)))
         : name === "verify_result" && command.args.checks.includes("motion") ? MAX_COMMAND_TIMEOUT_MS : undefined;
       result = await (timeoutMs === undefined ? liveHub.command(name, payload, workspaceHandle) : liveHub.command(name, payload, workspaceHandle, { timeoutMs }));
       if (generation && result?.status === 'started' && session?.onJob) result = await session.onJob(result);
+      // Atelier's job ID belongs to its API; the started receipt's UUID belongs
+      // to the editor bus. Await installation here so the model never has to
+      // choose between these two trackers for a normal avatar request.
+      if (vrmGeneration && result?.ok && result.status === 'started') {
+        const args={action:'job.await',args:{jobId:result.jobId,timeoutMs:MAX_COMMAND_TIMEOUT_MS}};
+        const awaitPayload=session?.admission ? {name:'run_action',args,commandId:session.admission.commandId(),
+          host:payload.host,expectedRevision:result.revision?.after ?? payload.expectedRevision} : args;
+        result=await liveHub.command('run_action',awaitPayload,workspaceHandle,{timeoutMs:MAX_COMMAND_TIMEOUT_MS});
+      }
     } catch (error) {
       // A STALE_SCENE re-admits whichever family met it, so the retry the
       // model is told to make is admitted at the live revision.

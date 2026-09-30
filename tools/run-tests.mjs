@@ -14,6 +14,7 @@ if (!process.env.COZYCLAY_AGENT_SESSIONS_DIR) {
 }
 
 const NODE_FILES = [
+  "test/verify-agent-vrm-jobs.mjs",
   "test/verify-vrm-generation.mjs",
 	"test/verify-scene-cameras.mjs",
 	"test/bus/verify-scene-camera-commands.mjs",

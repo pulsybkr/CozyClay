@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {cameraBrowser} from './camera-browser-harness.mjs';
 import {connectController,discoverEndpoint} from '../bin/live/client.mjs';
+import {createStudioTools} from '../bin/agent/studio-tools.mjs';
 const b=await cameraBrowser();let controller;
 const until=async(expression,ms=240000)=>{const deadline=Date.now()+ms;while(!await b.evaluate(expression)){if(Date.now()>deadline)throw Error(`Timeout: ${expression}`);await new Promise(r=>setTimeout(r,250));}};
 try {
@@ -10,7 +11,16 @@ try {
   controller=await connectController(discoverEndpoint(Number(process.env.COZYCLAY_LIVE_PORT||5291)));
   const workspaceHandle=await b.evaluate("document.querySelector('.live-workspace-handle').dataset.liveWorkspace");
   const request=async(name,args,timeoutMs=30000)=>{const reply=await controller.request({type:'cmd',name,args,workspaceHandle,timeoutMs},{timeoutMs});assert.equal(reply.ok,true,JSON.stringify(reply.error));return reply.value;};
-  const run=async(action,args)=>{const {context}=await request('inspect_studio',{scope:'scene'});const host=Object.fromEntries(['workspaceId','documentEpoch','sceneId','sceneEpoch'].map(k=>[k,context.host[k]]));let result=await request('run_action',{name:'run_action',commandId:randomUUID(),host,expectedRevision:context.revision.scene,args:{action,args}});assert(result.ok,JSON.stringify(result));if(result.status==='started'){const next=(await request('inspect_studio',{scope:'scene'})).context;result=await request('run_action',{name:'run_action',commandId:randomUUID(),host,expectedRevision:next.revision.scene,args:{action:'job.await',args:{jobId:result.jobId,timeoutMs:300000}}},300000);assert(result.ok,JSON.stringify(result));}return result;};
+  const run=async(action,args)=>{
+    const {context}=await request('inspect_studio',{scope:'scene'});
+    const host=Object.fromEntries(['workspaceId','documentEpoch','sceneId','sceneEpoch'].map(k=>[k,context.host[k]]));
+    const admission={host,revision:context.revision.scene,commandId:randomUUID,refresh:async()=>{admission.revision=(await request('inspect_studio',{scope:'scene'})).context.revision.scene;}};
+    const tools=createStudioTools({workspaceHandle,session:{admission,actionIndex:context.actionIndex},liveHub:{command:(name,payload,_workspace,options)=>request(name,payload,options?.timeoutMs??30000)}});
+    const result=await tools.internal.invoke('run_action',{action,args});
+    assert(result.ok,JSON.stringify(result));
+    if(['character.generateVrm','character.importVrmJob'].includes(action))assert.equal(result.status,'completed','agent adapter awaits installation automatically');
+    return result;
+  };
   const history=await b.evaluate("(async()=>await(await fetch('/vrm-api/api/v1/jobs?limit=20')).json())()");
   const existing=history.jobs.find(job=>job.status==='completed');assert(existing,'API has a completed job for the resume/import check');
   await run('view.setMode',{mode:'scene'});
