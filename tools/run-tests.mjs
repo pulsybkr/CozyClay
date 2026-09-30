@@ -18,6 +18,7 @@ const NODE_FILES = [
   "test/verify-poly-pizza.mjs",
   "test/verify-poly-pizza-route.mjs",
   "test/verify-library-commands.mjs",
+  "test/verify-library-pane.mjs",
   "test/verify-vrm-generation.mjs",
 	"test/verify-scene-cameras.mjs",
 	"test/bus/verify-scene-camera-commands.mjs",

@@ -1,0 +1,78 @@
+/*
+ * The 3D library pane's chrome. Everything structural comes from the shelf it
+ * lives in (.assets-section, .assets-grid, .asset-card); these rules only add
+ * what a remote catalogue needs that a local one does not: a search field, a
+ * status line that has to stay legible while it changes, and a card that is
+ * visibly refused rather than absent.
+ */
+
+.library-pane .library-search {
+	display: flex;
+	gap: 8px;
+	margin: 0 0 8px;
+}
+
+.library-search-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 6px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--line, #34383c);
+	background: var(--panel, #1e2124);
+	color: inherit;
+	font: inherit;
+}
+
+.library-search-input::placeholder {
+	color: var(--muted, #8b9298);
+}
+
+.library-search-input:focus-visible {
+	outline: 2px solid var(--accent, #4f9cf9);
+	outline-offset: 1px;
+}
+
+/* aria-live: the line changes as the user types, so it must not reflow the
+   grid under the pointer. A fixed two-line box is the cheapest way to keep a
+   click aimed at a card landing on that card. */
+.library-pane .library-status {
+	margin: 0 0 8px;
+	min-height: 2.4em;
+	color: var(--muted, #8b9298);
+	font-size: 12px;
+	line-height: 1.2;
+}
+
+.library-pane .library-warnings {
+	margin: 0 0 8px;
+	padding-left: 18px;
+	color: var(--warn, #d9a441);
+	font-size: 12px;
+}
+
+/* A refused model stays in the grid, visibly refused: dimmed, struck through
+   on its licence line, and not clickable. Hiding it would read as "the
+   library does not have this", which is a different and wrong message. */
+.library-card-blocked {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.library-card-blocked .asset-card-kind {
+	text-decoration: line-through;
+}
+
+.library-card-placeholder {
+	display: grid;
+	place-items: center;
+	font-size: 28px;
+	color: var(--muted, #8b9298);
+}
+
+/* A remote thumbnail is a later arrival than the card; reserving its box keeps
+   the grid from jumping as pictures land one by one. */
+.library-card img.asset-card-preview {
+	aspect-ratio: 1 / 1;
+	object-fit: contain;
+	background: rgba(255, 255, 255, 0.03);
+}
