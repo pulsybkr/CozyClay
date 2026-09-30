@@ -86,7 +86,7 @@ export function register(registry, ports) {
 			// saw nowhere, or worse, retry until something slips through.
 			if (blocked.length) warnings.push(`${blocked.length} result${blocked.length === 1 ? "" : "s"} cannot be used in the studio because of the licence (${blocked.map((model) => `${model.title}: ${model.license}`).join(", ")}).`);
 			const heavy = models.filter((model) => model.heavy);
-			if (heavy.length) warnings.push(`${heavy.length} result${heavy.length === 1 ? " is" : "s are"} heavy enough to slow the import (${heavy.map((model) => `${model.title}: ${model.triCount} triangles`).join(", ")}).`);
+			if (heavy.length) warnings.push(`${heavy.length} result${heavy.length === 1 ? " is" : "s are"} heavy enough to slow the import (${heavy.map((model) => `${model.title}: ${model.triCount.toLocaleString("en-US")} triangles`).join(", ")}).`);
 			return {
 				affectedIds: [],
 				summary: models.length
@@ -115,6 +115,10 @@ export function register(registry, ports) {
 			} catch (error) {
 				fail("TARGET_NOT_READY", `Not downloaded: ${error?.message || error}`);
 			}
+			// The domain owns the bytes-to-object path, exactly as it does for a
+			// dropped file; the port is the fallback for a host that mounts it the
+			// other way round. Reading the domain first keeps ONE implementation on
+			// the hot path instead of two that can drift.
 			const importLibraryModel = store().importLibraryModel ?? ports.importLibraryModel;
 			if (typeof importLibraryModel !== "function") fail("CAPABILITY_MISSING", "This editor cannot place a downloaded model.");
 			// The requested place, or none at all so the domain stands the model in
