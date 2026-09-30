@@ -14,6 +14,8 @@ if (!process.env.COZYCLAY_AGENT_SESSIONS_DIR) {
 }
 
 const NODE_FILES = [
+	"test/verify-scene-cameras.mjs",
+	"test/bus/verify-scene-camera-commands.mjs",
 	"test/verify-vrm-project.mjs",
 	"test/verify-facial-expressions.mjs",
 	"test/verify-morphgs-exporter.mjs",
@@ -253,6 +255,7 @@ const NODE_FILES = [
 ];
 
 const BROWSER_FILES = [
+  "test/qa-scene-cameras.mjs",
 	"test/qa-motion-readiness-browser.mjs",
 	"test/qa-export-recovery-browser.mjs",
 	"test/verify-camera-mode-browser.mjs",
@@ -293,7 +296,7 @@ const BROWSER_FILES = [
 // The inventory sweep only picks up `verify*.mjs`; a browser suite named for
 // the QA runner it needs is listed here so it still shows up in the manifest
 // (as an EXCLUDE with its reason) instead of going unmentioned.
-const EXTRA_INVENTORY = ["test/qa-studio-agent-browser.mjs", "test/qa-agent-scenarios-browser.mjs", "test/qa-execution-outcomes-browser.mjs", "test/qa-motion-readiness-browser.mjs", "test/qa-export-recovery-browser.mjs", "test/qa-agent-view-toggle-browser.mjs", "test/qa-camera-tutorial-browser.mjs", "test/qa-first-shot-handoff-browser.mjs", "test/qa-tutorial-analytics-browser.mjs", "test/qa-camera-pointer-lock-browser.mjs", "test/qa-first-edit-browser.mjs", "test/qa-ia-tail-browser.mjs", "test/qa-keyframe-pack-browser.mjs", "test/qa-preview-browser.mjs", "test/qa-project-resources-browser.mjs", "test/qa-reference-slots-browser.mjs", "test/qa-scene-playback-browser.mjs", "test/qa-scene-switcher-browser.mjs", "test/qa-send-to-ai-browser.mjs", "test/qa-view-menu-browser.mjs", "test/qa-agent-activity-browser.mjs", "test/qa-live-reconnect-browser.mjs"];
+const EXTRA_INVENTORY = ["test/qa-scene-cameras.mjs", "test/qa-studio-agent-browser.mjs", "test/qa-agent-scenarios-browser.mjs", "test/qa-execution-outcomes-browser.mjs", "test/qa-motion-readiness-browser.mjs", "test/qa-export-recovery-browser.mjs", "test/qa-agent-view-toggle-browser.mjs", "test/qa-camera-tutorial-browser.mjs", "test/qa-first-shot-handoff-browser.mjs", "test/qa-tutorial-analytics-browser.mjs", "test/qa-camera-pointer-lock-browser.mjs", "test/qa-first-edit-browser.mjs", "test/qa-ia-tail-browser.mjs", "test/qa-keyframe-pack-browser.mjs", "test/qa-preview-browser.mjs", "test/qa-project-resources-browser.mjs", "test/qa-reference-slots-browser.mjs", "test/qa-scene-playback-browser.mjs", "test/qa-scene-switcher-browser.mjs", "test/qa-send-to-ai-browser.mjs", "test/qa-view-menu-browser.mjs", "test/qa-agent-activity-browser.mjs", "test/qa-live-reconnect-browser.mjs"];
 
 function verificationFiles(directory) {
 	return readdirSync(directory, { withFileTypes: true })
@@ -415,7 +418,7 @@ function meetsMinimumNodeVersion([major, minor, patch], current = process.versio
 const hasNodeSqlite = meetsMinimumNodeVersion(NODE_SQLITE_MIN);
 
 // The MCP suites fork mcp/server.mjs, which imports the MCP SDK from
-// mcp/node_modules — a tree the root `npm install` does not create. On a
+// mcp/node_modules â€” a tree the root `npm install` does not create. On a
 // fresh clone those suites must degrade to an actionable EXCLUDE instead of
 // a startup timeout that swallows the real ERR_MODULE_NOT_FOUND (CI installs
 // them explicitly with `npm --prefix mcp ci`, so its coverage is unchanged).

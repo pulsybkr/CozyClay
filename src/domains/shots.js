@@ -16,16 +16,18 @@ import { defaultRailRange, clampRailRange } from '../camera-rail-schedule.js';
 import { timelineSpan, timelineContentExtent } from '../timeline-extent.js';
 import { trackFeature } from '../analytics.js';
 import { ko, isKo } from '../locale.js';
+import { normalizeSceneCameras, resolveSceneCameras, reconcileSceneCameraEdits } from '../scene-cameras.js';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function normalizeState(value) {
   const document = createShotAuthoringDocument(value);
-  const shots = document.shots.map(shot => {
+  const cameras = document.cameras ?? [];
+  const shots = resolveSceneCameras(document.shots,cameras).map(shot => {
     const follow = shot.camera.railFollow;
     if (follow?.mode !== 'range') return shot;
     return { ...shot, camera: updateCameraBlock(shot.camera, { railFollow: { mode: 'range', ...clampRailRange(follow, shot.endFrame - shot.startFrame + 1) } }) };
   });
-  return { ...value, shots, frameCount: document.frameCount ?? DEFAULT_DURATION_S * TIMELINE_FPS };
+  return { ...value, cameras, shots, frameCount: document.frameCount ?? DEFAULT_DURATION_S * TIMELINE_FPS };
 }
 
 // The stable handle survives scene loads. Camera pose belongs to the same
@@ -43,7 +45,18 @@ export function createShotsDomain(appContext, initial = {}) {
   const read = () => state().shots;
   function writeState(update) {
     return documentStore.write('shot', before => {
-      const next = normalizeState(typeof update === 'function' ? update(before) : update);
+      const candidate = {...(typeof update === 'function' ? update(before) : update)};
+      // Clearing a linked shot's keys explicitly returns that plan to a local
+      // camera; the reusable definition remains available for other shots.
+      candidate.shots = candidate.shots.map(shot => {
+        const prior = before.shots.find(row=>row.id === shot.id);
+        if (shot.cameraId && prior?.cameraKeys.length && !shot.cameraKeys.length) {
+          const {cameraId,cameraOffsetFrame,...local} = shot;
+          return local;
+        }
+        return shot;
+      });
+      const next = normalizeState({...candidate,cameras:reconcileSceneCameraEdits(before,candidate)});
       return same(before, next) ? before : next;
     });
   }
@@ -65,7 +78,11 @@ export function createShotsDomain(appContext, initial = {}) {
   const publish = () => {
     const next = state(), live = appContext.live.state;
     if (live) {
-      appContext.patchLive({ shots: next.shots, fovDeg: next.fovDeg });
+      appContext.patchLive({ shots: next.shots, cameras:next.cameras, fovDeg: next.fovDeg });
+      const at = appContext.live.state.timeline.currentFrame ?? 0;
+      const priorShot = previous.shots[shotIndexAtFrame(previous.shots,at)], currentShot = next.shots[shotIndexAtFrame(next.shots,at)];
+      if (currentShot && (!same(priorShot?.cameraKeys,currentShot.cameraKeys) || !same(priorShot?.camera,currentShot.camera)))
+        appContext.shared.manualCameraOverrideRef.current = false;
       appContext.patchTimeline({ frameCount: next.frameCount });
       if (next.camera && (!same(previous.camera, next.camera) || previous.fovDeg !== next.fovDeg || previous.manual !== next.manual)) renderCamera(next.camera, next.manual, next.fovDeg);
       if (!loading && !same(previous, next)) appContext.shared.markSemanticEdit('shot', previous, next);
@@ -184,8 +201,9 @@ export function createShotsDomain(appContext, initial = {}) {
   const domain = { documentStore, state, read, write, writeState, beginAction, run, edit, beginGesture, finishGesture,
     bindRender(context) { appContext = context; },
     capture: () => appContext.shared.captureCurrentFraming(), frame, captureCamera, placeCamera, setLens, renderCamera,
+    cameraContext:()=>appContext.ports.read(),
     canUndo: id => documentStore.canUndo(id), stepHistory: redo => { finishGesture(); return Boolean((redo ? documentStore.redo : documentStore.undo)()); },
-    document: () => ({ shots: read() }), publish: value => writeState(before => ({ ...before, shots: value.shots, ...cameraPatch(value.camera, value.manual) })), commitDraft,
+    document: () => ({ shots: read(), ...(state().cameras.length ? {cameras:state().cameras} : {}) }), publish: value => writeState(before => ({ ...before, shots: value.shots, ...cameraPatch(value.camera, value.manual) })), commitDraft,
     load(value) { finishGesture(true); loading = true; try { replaceState(initialState(value)); notify(); } finally { loading = false; } },
     dispose() { finishGesture(true); unregister(); unsubscribe(); release(); native.dispose(); listeners.clear(); },
   };
@@ -381,7 +399,7 @@ export function useShots(appContext) {
       appContext.bus.run('shot.addKey', { shotId: target.id, frame: target.startFrame });
       exportShots = appContext.storeDomain('shot').read();
     }
-    const range = target && (shotId || !appContext.shared.motion) ? { startFrame: target.startFrame, endFrame: target.endFrame }
+    const range = target && (shotId || (!appContext.shared.motion && shots.length === 1)) ? { startFrame: target.startFrame, endFrame: target.endFrame }
       : { startFrame: 0, endFrame: Math.max(0, appContext.shared.currentRecordFrameCount() - 1) };
     return appContext.shared.executeExportRequest(appContext.shared.exportRequest('video', async job => {
       const abort = () => job.controller.abort(commandContext.signal.reason);

@@ -2379,7 +2379,7 @@ export default function App() {
 	const actorStageRef = useRef(null);
 	appContext.publishScenes(scenes);
 	activeSceneIdRef.current = activeSceneId;
-	shotDocumentRef.current = createShotAuthoringDocument({ shots, waypoints, frameCount: tlFrameCount });
+	shotDocumentRef.current = createShotAuthoringDocument({ shots, waypoints, frameCount: tlFrameCount, cameras:appContext.storeDomain('shot')?.state().cameras });
 	const persistedCharacters = characters.map(({ sessionMotion, ...entry }) => {
 		if (!entry.motionRef) return entry;
 		const { correctionKeys: previous, ...motionRef } = entry.motionRef;
@@ -6341,7 +6341,7 @@ export default function App() {
 		return { host: { workspaceId: liveWorkspaceIdRef.current, documentEpoch: studioDocumentEpochRef.current,
 				sceneId: activeSceneIdRef.current, sceneEpoch: studioSceneEpochRef.current }, workspaceHandle: liveWorkspaceHandleRef.current,
 			sceneName: live.scenes.find(s => s.id === activeSceneIdRef.current)?.name ?? "Untitled Scene", aspect: live.stage.shotAspect, stage: live.stage,
-			objects: storeRef.current.objects, characters: list, targets, shots: live.shots, frameCount: live.timeline.frameCount,
+			objects: storeRef.current.objects, characters: list, targets, shots: live.shots, cameras:appContext.storeDomain('shot')?.state().cameras ?? [], frameCount: live.timeline.frameCount,
 			selection: live.studioSelection, activeCharacterId: live.activeCharacterId, selectedShotId: live.studioShotId,
 			view: live.studioView, camera: live.studioCamera ?? readStudioCamera(), filmback: live.filmback, manual: manualCameraOverrideRef.current,
 			bridgeReady: Boolean(bridge?.ok), busy: storeRef.current.present() !== storeRef.current.objects || Boolean(studioGestureRef.current ||
@@ -7308,6 +7308,7 @@ export default function App() {
 								fps={tlFps}
 								keys={cameraKeys}
 								shots={shots}
+								selectedShot={activeShot}
 								scene={playbackScene}
 								camRef={shotCamRef}
 								look={look}
@@ -7809,7 +7810,7 @@ export default function App() {
 					    (#193, R1): framing is the bar's job, delivery is Export's, and
 					    selecting the camera now switches to Camera mode so the bar's
 					    controls are on screen when this panel opens. */}
-					<CameraPanel isCameraSelection={isCameraSelection} shot={shot} moveSequence={moveSequence} cameraKeys={cameraKeys} activeShot={activeShot} changeShotTargetModel={changeShotTargetModel} />
+					<CameraPanel isCameraSelection={isCameraSelection || workflowMode==='camera'} cameras={shotsDomain.state().cameras} frame={tlFrame} shot={shot} moveSequence={moveSequence} cameraKeys={cameraKeys} activeShot={activeShot} changeShotTargetModel={changeShotTargetModel} />
 
 				<FacialExpressionsPanel hidden={!isCharacterSelection} character={activeChar} rig={activeRig} seconds={tlFrame / TIMELINE_FPS} duration={tlFrameCount / TIMELINE_FPS} onAgent={() => setStudioAgentMode(true)} />
 				<SubjectsPanel

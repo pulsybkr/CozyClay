@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {cameraBrowser,assertPose} from './camera-browser-harness.mjs';
+import {connectController,discoverEndpoint} from '../bin/live/client.mjs';
+import {cameraMoveAt} from '../src/camera-move.js';
+const b=await cameraBrowser(); let controller;
+const until=async expression=>{const end=Date.now()+180000; while(!await b.evaluate(expression)){if(Date.now()>end)throw Error(`Timeout: ${expression}`);await new Promise(r=>setTimeout(r,200));}};
+try {
+  await b.seed();
+  await until("!!document.querySelector('.live-workspace-handle')");
+  controller=await connectController(discoverEndpoint(Number(process.env.COZYCLAY_LIVE_PORT||5291)));
+  const workspaceHandle=await b.evaluate("document.querySelector('.live-workspace-handle').dataset.liveWorkspace");
+  const request=async(name,args)=>{const reply=await controller.request({type:'cmd',name,args,workspaceHandle,timeoutMs:30000},{timeoutMs:30000});assert.equal(reply.ok,true,JSON.stringify(reply.error));return reply.value;};
+  const run=async(action,args)=>{const {context}=await request('inspect_studio',{scope:'scene'});const host=Object.fromEntries(['workspaceId','documentEpoch','sceneId','sceneEpoch'].map(k=>[k,context.host[k]]));const receipt=await request('run_action',{name:'run_action',commandId:randomUUID(),host,expectedRevision:context.revision.scene,args:{action,args}});assert.equal(receipt.ok,true,JSON.stringify(receipt));return receipt;};
+  await run('view.setMode',{mode:'camera'});
+  await until("!!document.querySelector('[data-scene-cameras]')");
+  await b.evaluate("document.querySelector('[data-scene-cameras]').scrollIntoView()");
+  const save=await b.evaluate("Array.from(document.querySelectorAll('[data-scene-cameras] button')).findIndex(x=>x.textContent==='Save shot camera')");
+  await b.click(`[data-scene-cameras] button:nth-of-type(${save+1})`);
+  let library=await request('inspect_studio',{scope:'cameras'});
+  const camera=library.cameras[0];assert(camera,'UI saves a named camera');
+  const a={pos:{x:0,y:1.6,z:5},yaw:0,pitch:0,fovDeg:40}, z={...a,pos:{x:2,y:1.6,z:4}}, reaction={...a,pos:{x:-3,y:1.6,z:5}};
+  await run('camera.set',{cameraId:camera.id,set:{name:'Approche',mode:'keys',interpolation:'linear',cameraKeys:[{frame:0,framing:a},{frame:47,framing:z}]}});
+  await run('camera.create',{cameraId:'reaction-camera',name:'Réaction',shotId:'shot-b'});
+  await run('camera.set',{cameraId:'reaction-camera',set:{cameraKeys:[{frame:0,framing:reaction}]}});
+  for(const [frame,expected] of [[0,a],[47,z],[48,reaction]]){
+    await b.evaluate(`window.__cozyclay.scrub(${frame})`);
+    await until(`window.__cozyclay.shotCam.position.x===${expected.pos.x}`);
+    assertPose(await b.pose(),expected,`live frame ${frame}`);
+  }
+  await b.evaluate('window.__cozyclay.scrub(23)');
+  await until('window.__cozyclay.shotCam.position.x>0 && window.__cozyclay.shotCam.position.x<2');
+  const mid=await b.pose();assertPose(mid,cameraMoveAt([{frame:0,framing:a,interpolation:'linear'},{frame:47,framing:z}],{x:0,z:0},23),'camera travels continuously inside the shot');
+  const project=await b.evaluate('window.__cozyclayProject.export("Scene cameras QA")');
+  assert(JSON.stringify(project).includes('reaction-camera'),'project stores camera references');
+  assert.equal(await b.evaluate(`(async()=> (await window.__cozyclayProject.open(${JSON.stringify(project)})).ok)()`),true);
+  await b.ready();
+  library=await request('inspect_studio',{scope:'cameras'});assert.equal(library.cameras.length,2,'library survives reopening');
+  await run('view.setMode',{mode:'camera'});
+  await b.evaluate("document.querySelector('[data-scene-cameras]').scrollIntoView()");
+  const dir='docs/qa/scene-cameras';await mkdir(dir,{recursive:true});
+  const shot=await b.send('Page.captureScreenshot',{format:'png'});await writeFile(`${dir}/library.png`,Buffer.from(shot.data,'base64'));
+  await b.evaluate("window.__cameraExport=null; window.__exportOffscreen({startFrame:0,endFrame:95,probeMetadata:true}).then(x=>window.__cameraExport=x).catch(e=>window.__cameraExport={error:e.message}); true");
+  await until('!!window.__cameraExport');
+  const result=await b.evaluate('window.__cameraExport');assert(!result.error,result.error);
+  assert.equal(result.encodedFrameCount,96);assert.equal(result.mimeType,'video/mp4');assert(Math.abs(result.metadata.duration-4)<.05);
+  assert.notEqual(result.hashes[47],result.hashes[48],'export renders different viewpoints on both sides of the hard cut');
+  await writeFile(`${dir}/result.json`,JSON.stringify({checks:['UI camera creation','agent camera editing and assignment','live travel','hard cut','project reopen','MP4 export'],encodedFrameCount:result.encodedFrameCount,metadata:result.metadata,cutHashes:[result.hashes[47],result.hashes[48]]},null,2));
+  console.log('PASS scene cameras: real UI, agent, travelling, cuts, save/reopen and 4-second MP4 export');
+} finally {controller?.close();b.close();}

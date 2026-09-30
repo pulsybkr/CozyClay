@@ -60,6 +60,7 @@ const entries = [
 	{ path: "stage.sensorId", type: "enum", persisted: true, undoDomain: "stage", normalizer: "createSceneStage", enum: ["super16", "super35", "fullFrame", "65mm"] },
 	{ path: "shot.crud", type: "array", persisted: true, undoDomain: "shot", normalizer: null, actions: ["shot.create", "shot.split", "shot.duplicate", "shot.remove", "shot.setRange", "shot.reorder"], note: "create/split/duplicate/reorder/remove/range through the shared action registry" },
 	{ path: "shot.cameraKeys", type: "array", persisted: true, undoDomain: "shot", normalizer: null, frameMin: 0 },
+	{ path: "shot.cameraId", type: "id", nullable:true, persisted:true, undoDomain:"shot", normalizer:"repairCamera", actions:["camera.assign"], note:"named scene camera reference; camera animation uses a local clock" },
 	{ path: "shot.cameraRail", type: "array", persisted: true, undoDomain: "shot", normalizer: "repairCamera", actions: ["shot.setCameraRail", "shot.clearCameraRail"], note: "rail points; crane/dolly timing follow the shot's camera block" },
 	{ path: "shot.targetModel", type: "id", persisted: true, undoDomain: "shot", normalizer: "repairCamera" },
 	{ path: "shot.freeCamera", type: "vec3", persisted: false, undoDomain: "shot", normalizer: null, note: "transient until keyed" },

@@ -308,8 +308,10 @@ export function cameraMoveAt(keys, anchor, frame, filmback = {}) {
 	for (let i = 0; i < keys.length - 1; i++) {
 		const a = keys[i];
 		const b = keys[i + 1];
+		if (frame === b.frame) return b.framing;
 		if (frame <= b.frame) {
-			return interpolateFraming(a.framing, b.framing, anchor, (frame - a.frame) / (b.frame - a.frame), easeInOut, filmback);
+			if (a.interpolation === 'hold' && frame < b.frame) return a.framing;
+			return interpolateFraming(a.framing, b.framing, anchor, (frame - a.frame) / (b.frame - a.frame), a.interpolation === 'linear' ? t => t : easeInOut, filmback);
 		}
 	}
 	return last.framing;

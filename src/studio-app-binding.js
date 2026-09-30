@@ -66,9 +66,9 @@ export function createStudioAppBinding(ports) {
 		const authored = JSON.stringify([raw.objects, authoredCharacters, raw.shots, raw.frameCount, raw.stage, document]);
 		if (authoredKey !== undefined && authoredKey !== authored && observedSceneRevision === ports.revision.current) ports.revision.current++;
 		authoredKey = authored; observedSceneRevision = ports.revision.current;
-		const liveIds = new Set([...raw.objects, ...raw.characters, ...raw.shots].map(row => row.id));
+		const liveIds = new Set([...raw.objects, ...raw.characters, ...raw.shots,...(raw.cameras ?? [])].map(row => row.id));
 		for (const id of tokens.keys()) if (!liveIds.has(id)) tokens.delete(id);
-		for (const entry of [...raw.objects, ...characters, ...raw.shots]) {
+		for (const entry of [...raw.objects, ...characters, ...raw.shots,...(raw.cameras ?? [])]) {
 			// Display-only name/tint changes never revoke a motion target.
 			const { name, subject, tint, identityImage, ...content } = entry;
 			const key = JSON.stringify(content), previous = tokens.get(entry.id);
@@ -155,10 +155,12 @@ export function createStudioAppBinding(ports) {
 			units: { distance: "m", angle: "deg", up: "+Y", yawZero: "+Z", yawPositiveToward: "+X", pivot: "base", fps: 24, rangeEnd: "exclusive" },
 			scene: { name: s.sceneName, aspect: s.aspect, floorY: 0, frameCount: s.frameCount, objectCount: s.objects.length, characterCount: s.characters.length },
 			selection: s.selection, activeCharacterId: s.activeCharacterId, view: s.view,
-			shot: shot ? { id: shot.id, name: shot.name, range: range(shot), mode: shot.camera?.mode ?? "keys" } : null, camera: s.camera,
+			shot: shot ? { id: shot.id, name: shot.name, range: range(shot), mode: shot.camera?.mode ?? "keys",...(shot.cameraId ? {cameraId:shot.cameraId} : {}) } : null, camera: s.camera,
 			// buildStudioContext selects the detailed rows and writes the real page.
 			entities, entityPage: { returned: 0, total: 0, truncated: false, nextCursor: null },
-			shots: s.shots.map(row => ({ id: row.id, name: row.name, range: range(row), keyCount: row.cameraKeys.length })), shotsTruncated: false,
+			shots: s.shots.map(row => ({ id: row.id, name: row.name, range: range(row), keyCount: row.cameraKeys.length,
+				...(row.cameraId ? {cameraId:row.cameraId,cameraName:s.cameras?.find(camera=>camera.id === row.cameraId)?.name ?? row.cameraId} : {}) })), shotsTruncated: false,
+			...((s.cameras ?? []).length ? {cameras:s.cameras.map(camera=>({id:camera.id,name:camera.name,mode:camera.camera.mode,keyCount:camera.cameraKeys.length,interpolation:camera.interpolation}))} : {}),
 			assets: assetList(s), recentReceipts: [...receipts.values()].filter(r => r.ok).reverse().slice(0, 3).map(r => ({ id: r.receiptId, summary: r.status, canUndoDirect: ports.canUndo(r) })),
 			jobs: [], capabilities: { profile: "studio-slice-1", tools: STUDIO_TOOL_FAMILIES,
 				rigReady: Boolean(s.targets.get(s.activeCharacterId)?.rig), cameraReady: Boolean(s.camera), bridgeReady: s.bridgeReady },
@@ -197,7 +199,10 @@ export function createStudioAppBinding(ports) {
 			...(patched.length ? { patched } : {}) };
 		if (patched.length) return { patched };
 		const shot = s.shots.find(row => row.id === id);
-		if (shot) return { name: shot.name || shot.id, range: { startFrame: shot.startFrame, endFrameExclusive: shot.endFrame + 1 } };
+		if (shot) return { name: shot.name || shot.id, range: { startFrame: shot.startFrame, endFrameExclusive: shot.endFrame + 1 },
+			...(shot.cameraId ? {cameraId:shot.cameraId} : {}) };
+		const sceneCamera = s.cameras?.find(row=>row.id === id);
+		if (sceneCamera) return {name:sceneCamera.name,keyCount:sceneCamera.cameraKeys.length};
 		const entity = s.objects.find(row => row.id === id) ?? s.characters.find(row => row.id === id);
 		if (entity) return { name: entity.name || entity.subject || entity.id, position: { x: entity.x, y: entity.y ?? 0, z: entity.z } };
 		return { removed: true };
@@ -321,6 +326,10 @@ export function createStudioAppBinding(ports) {
 			// Every scope carries the context: its revision is what the agent's next
 			// command is admitted at, so a scope without it leaves that admission stale.
 			if (command.args.scope === "catalogue") return { context: c, ...studioObjectCatalogue() };
+			if (command.args.scope === 'cameras') {
+				const cameras = (refresh().cameras ?? []).filter(camera=>(!args.ids || args.ids.includes(camera.id)) && (!args.query || camera.name.includes(args.query)));
+				return {context:c,cameras:structuredClone(cameras),total:cameras.length};
+			}
 			if (command.args.scope === "document") return { context: c, scope: "document",
 				...readElementDocument(refresh().document, command.args, c.host.sceneId) };
 			// Discovery for run_action: every registered action with its label, kind,

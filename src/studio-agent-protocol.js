@@ -37,7 +37,7 @@ export const STUDIO_VARIANTS = freezeStudioData({
 	framingViews: ["front", "front three-quarter", "profile", "rear three-quarter", "back"], framingLevels: ["ground", "low", "hip", "eye", "high", "overhead"],
 	framingSides: ["left", "right"], positionSides: ["left", "right", "front", "behind"], positionBases: ["world", "subject", "shot_camera"], collisionPolicies: ["report", "avoid"],
 	objectOps: ["create", "update", "remove", "group", "ungroup"], characterOps: ["create", "update", "remove"],
-	inspectionScopes: ["selection", "scene", "entities", "shot", "motion", "catalogue", "actions", "document"], receiptStatuses: ["applied", "partial", "noop", "transient", "installed", "undone"],
+	inspectionScopes: ["selection", "scene", "entities", "shot", "cameras", "motion", "catalogue", "actions", "document"], receiptStatuses: ["applied", "partial", "noop", "transient", "installed", "undone"],
 	opStatuses: ["applied", "partial", "noop"],
 	jobStates: ["queued", "generating", "preparing", "verifying", "repairing", "committing", "reconciling", "installed", "review_required", "failed", "cancelled", "stale_target", "stale_environment"],
 });
@@ -117,7 +117,7 @@ const source = union(generateSource, object({ kind: literal("reuse"), artifactId
  * records what an element IS, not how JSON carries it. */
 const dataImage = { ...text(2 * 1024 * 1024), pattern: "^data:image/[A-Za-z0-9.+-]+[;,]" };
 const promptBlock = object({ startFrame: integer(), endFrame: integer(1), text: text(2000) }, { id });
-const cameraKey = object({ frame: integer(), framing: object({ pos: vec3, yaw: number(), pitch: number(), fovDeg: number(1, 179) }) }, { id });
+const cameraKey = object({ frame: integer(), framing: object({ pos: vec3, yaw: number(), pitch: number(), fovDeg: number(1, 179) }) }, { id, interpolation:choices(['smooth','linear','hold']) });
 const objectRoute = nullable(object({ points: array(vec3, 64, 2) }, { speed: number(0, 50), faceTravel: bool, loop: bool, extend: bool }));
 const PATCH_VALUE_SCHEMAS = {
 	"character.expressions": array(object({ expression: text(128), keys: array(object({ t: number(0, 3600), weight: number(0, 1) }), 512, 1) }), 64),
@@ -217,8 +217,8 @@ const indexRow = object({ id, kind: choices(["object", "character", "rig"]) }, {
 // Its schema is on request (inspect_studio scope "actions" with ids); the
 // declared generation and hub timeout ride along for the sidecar's gate.
 const actionIndexRow = object({ id }, { label: name, generation: literal("motion"), timeoutMs: integer(1, 300_000) });
-const shotSummary = object({ id, name, range, keyCount: integer() }, { subjectIds: ids(24, 0) });
-const currentShot = object({ id, name, range, mode: choices(STUDIO_VARIANTS.shotModes) }, { subjectIds: ids(24, 0) });
+const shotSummary = object({ id, name, range, keyCount: integer() }, { subjectIds: ids(24, 0),cameraId:nullable(id),cameraName:name });
+const currentShot = object({ id, name, range, mode: choices(STUDIO_VARIANTS.shotModes) }, { subjectIds: ids(24, 0),cameraId:nullable(id) });
 const camera = object({ position: vec3, lookAt: vec3, focalMm: positive, sensorId: id, slate: name });
 // What the agent can place: a catalogue kind, or an asset imported into the scene.
 const assetTypes = choices(["primitive", "set-piece", "image", "mesh"]);
@@ -233,7 +233,8 @@ const contextSchema = object({
 	shots: array(shotSummary, 8), shotsTruncated: bool, assets: array(assetSummary, STUDIO_CONTEXT_LIMITS.assets),
 	recentReceipts: array(object({ id, summary: name, canUndoDirect: bool }), 3), jobs: array(jobSummary, 8),
 	capabilities: object({ profile: literal("studio-slice-1"), tools: array(choices(STUDIO_TOOLS), STUDIO_TOOLS.length, 0, true) }, { rigReady: bool, cameraReady: bool, bridgeReady: bool }),
-}, { entityIndex: array(indexRow, STUDIO_CONTEXT_LIMITS.entityIndex), actionIndex: array(actionIndexRow, 512) });
+}, { entityIndex: array(indexRow, STUDIO_CONTEXT_LIMITS.entityIndex), actionIndex: array(actionIndexRow, 512),
+	cameras:array(object({id,name,mode:choices(STUDIO_VARIANTS.shotModes),keyCount:integer(),interpolation:choices(['smooth','linear','hold'])}),32) });
 const guardSchema = object({ ...identityFields, targetId: id, token: id });
 const efforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
 // Pictures the author pasted or dropped into the composer (#367). Inline bytes
@@ -257,6 +258,7 @@ const verification = object({ id, status: choices(["verified", "unverified"]), p
 // not a missing member.
 const patchedValue = object({ path: text(120) }, { number: number(), text: nullable(text(512)), flag: bool, vec: vec3, count: integer(), bytes: integer() });
 const readback = object({}, { position: vec3, yawDeg: number(), rotationDeg: vec3, scale: union(positive, positiveVec3), name, color: text(32), hidden: bool, modelId: id, renderer: id,
+	keyCount:integer(), cameraId:nullable(id),
 	parentId: nullable(id), childIds: ids(100, 0), removed: bool, range, camera, keyId: id, frame: integer(), subjectIds: ids(24, 0), selection, activeCharacterId: nullable(id), shotId: nullable(id), view, token: id, takeId: nullable(id), statureM: positive,
 	patched: array(patchedValue, 32, 1) });
 const checks = object({ coverage: name }, { relationSatisfied: bool, overlapIds: ids(100, 0), actualGapM: number(), requestedGapM: number(0), maximumFootprintOverlapM: number(0),

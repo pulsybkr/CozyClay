@@ -97,6 +97,7 @@ export function cutAtFrame(shots, shotId, frame, currentFraming) {
 		...source.cameraKeys.filter((key) => key.frame >= cutFrame),
 		{ id: createStableItemId("camera-key"), frame: cutFrame, framing: currentFraming },
 	], source.camera);
+	if (source.cameraId) { downstream.cameraId = source.cameraId; downstream.cameraOffsetFrame = (source.cameraOffsetFrame ?? 0)+cutFrame-source.startFrame; }
 	return [...shots.slice(0, index), upstream, downstream, ...shots.slice(index + 1)];
 }
 
@@ -177,6 +178,7 @@ export function duplicateShot(shots, shotId, frameCount) {
 	const delta = startFrame - source.startFrame;
 	const duplicate = createShot(`${source.name} copy`, startFrame, startFrame + duration - 1,
 		source.cameraKeys.map((key) => ({ ...key, id: createStableItemId("camera-key"), frame: key.frame + delta })), source.camera);
+	if (source.cameraId) { duplicate.cameraId = source.cameraId; duplicate.cameraOffsetFrame = source.cameraOffsetFrame ?? 0; }
 	return [...shots, duplicate].sort((a, b) => a.startFrame - b.startFrame);
 }
 

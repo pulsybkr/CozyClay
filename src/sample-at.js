@@ -94,7 +94,7 @@ export function sampleAt(scene, shot, frame) {
 	if (shot) {
 		const block = createCameraBlock(shot.camera);
 		const keyedCamera = () => sharedCamera(cameraMoveAt(
-			shot.cameraKeys,
+			shot.cameraAnimationKeys ?? shot.cameraKeys,
 			source.cameraAnchor ?? source.subject ?? { x: 0, z: 0 },
 			sampledFrame,
 			source.filmback,

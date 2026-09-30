@@ -6,6 +6,7 @@
 // action sees its own edit at once.
 import { createStudioActionRegistry, STUDIO_ACTIONS } from "../studio-actions.js";
 import * as shot from "./shot.js";
+import * as camera from './camera.js';
 import * as cast from "./cast.js";
 import * as motion from "./motion.js";
 import * as objects from "./objects.js";
@@ -16,7 +17,7 @@ import * as exporting from "./export.js";
 import * as ai from "./ai.js";
 import * as stage from "./stage.js";
 
-export const COMMAND_MODULES = Object.freeze({ shot, cast, motion, objects, view, scene, project, export: exporting, ai, stage });
+export const COMMAND_MODULES = Object.freeze({ shot, camera, cast, motion, objects, view, scene, project, export: exporting, ai, stage });
 
 export function commandDeclarations(modules = COMMAND_MODULES) {
 	return Object.values(modules).flatMap(module => module.declarations.map(declaration => ({

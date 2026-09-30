@@ -3,11 +3,13 @@ import { ko, isKo } from "../locale.js";
 import { Field } from "../ui.jsx";
 import { VIDEO_MODEL_PRESETS } from "../model-presets.js";
 import { useBus } from "../app-context.js";
+import SceneCamerasPanel from './SceneCamerasPanel.jsx';
 
-export default function CameraPanel({ isCameraSelection, shot, moveSequence, cameraKeys, activeShot }) {
+export default function CameraPanel({ isCameraSelection, shot, moveSequence, cameraKeys, activeShot, cameras=[],frame=0 }) {
 	const { run } = useBus();
 	return (
 <Foldout hidden={!isCameraSelection} title={ko("Camera", "카메라")}>
+			<SceneCamerasPanel cameras={cameras} activeShot={activeShot} frame={frame} />
 						<div className="readout">
 						<span title={ko("camera to subject", "카메라와 피사체 거리")}>{shot.distance.toFixed(2)} m</span>
 						<span title={ko("nearest prime on the cropped filmback", "크롭된 필름백 기준 가장 가까운 단렌즈")}>{shot.focalMm} mm</span>

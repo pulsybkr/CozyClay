@@ -984,7 +984,7 @@ export function ShotRig({ preset, nonce, fovDeg, charA, charB, showB, probeX, pr
     frames at production cadence; follow mode reads the timeline playhead, so the camera and
     the character motion are two views of the same time axis — playing or
     scrubbing frame 72 at 24 fps puts the camera exactly 3 s into its move. */
-export function MoveRig({ playing, following, followFrame, fps, keys, shots, scene, camRef, look, isInterrupted, onDone }) {
+export function MoveRig({ playing, following, followFrame, fps, keys, shots, selectedShot, scene, camRef, look, isInterrupted, onDone }) {
 	const invalidate = useThree((state) => state.invalidate);
 	const preview = useRef({ frame: 0, finished: false, notified: false });
 	const handlers = useRef({ isInterrupted, onDone });
@@ -1001,7 +1001,7 @@ export function MoveRig({ playing, following, followFrame, fps, keys, shots, sce
 	useEffect(() => {
 		// A paused scrub changes the playhead without starting the render loop.
 		if (following && !playing) invalidate();
-	}, [followFrame, following, playing, invalidate]);
+	}, [followFrame, following, playing, shots, keys, invalidate]);
 	useEffect(() => {
 		if (!playing || keys.length < 1) return undefined;
 		const firstFrame = keys[0].frame;
@@ -1043,7 +1043,7 @@ export function MoveRig({ playing, following, followFrame, fps, keys, shots, sce
 			const timelineShot = following ? shotAtFrame(shots, frame) : null;
 			const sampledShot = timelineShot
 				? { ...timelineShot, camera: { mode: "keys" } }
-				: following ? null : { camera: { mode: "keys" }, cameraKeys: keys };
+				: following ? null : { ...selectedShot, camera: { mode: "keys" }, cameraKeys: keys };
 			const f = sampleAt(scene, sampledShot, frame).camera;
 			if (!f) return null;
 			cam.position.set(f.pos.x, f.pos.y, f.pos.z);

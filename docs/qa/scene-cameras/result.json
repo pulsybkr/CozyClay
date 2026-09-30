@@ -1,0 +1,20 @@
+{
+  "checks": [
+    "UI camera creation",
+    "agent camera editing and assignment",
+    "live travel",
+    "hard cut",
+    "project reopen",
+    "MP4 export"
+  ],
+  "encodedFrameCount": 96,
+  "metadata": {
+    "duration": 4,
+    "width": 1920,
+    "height": 1080
+  },
+  "cutHashes": [
+    "6ef79aca4202a45cca76372fd1f225e919ec9ef1dbbfdec0d3711878a5689664",
+    "02b10e32640b820c2c3d5e28c3c828b1e07f4bd73db2bb4b5754fc45d943a26b"
+  ]
+}

@@ -9,6 +9,7 @@ import { createShot } from "./cuts.js";
 import { normalizeStableItems } from "./stable-items.js";
 import { VIDEO_MODEL_PRESETS } from "./model-presets.js";
 import { elementByPath } from "./studio-elements.js";
+import { normalizeSceneCameras } from './scene-cameras.js';
 
 const VIDEO_MODEL_IDS = new Set(VIDEO_MODEL_PRESETS.map((preset) => preset.id));
 const CAMERA_KEY_LIMITS = elementByPath("shot.cameraKeys");
@@ -111,6 +112,7 @@ function repairKeys(entries, minFrame, maxFrame, ids = new Set()) {
 		byFrame.set(frame, {
 			id: key.id,
 			frame,
+			...(['smooth','linear','hold'].includes(key.interpolation) ? {interpolation:key.interpolation} : {}),
 			framing: {
 				pos: { x: key.framing.pos.x, y: key.framing.pos.y, z: key.framing.pos.z },
 				yaw: key.framing.yaw,
@@ -153,6 +155,8 @@ function repairShots(entries, frameCount, inheritedCamera = null, ids = new Set(
 		const endFrame = Math.max(startFrame, Math.min(frameCount - 1, nextStart - 1, storedEnd));
 		return {
 			id: entry.id,
+			...(typeof entry.cameraId === 'string' && entry.cameraId ? {cameraId:entry.cameraId,
+				cameraOffsetFrame:Number.isInteger(entry.cameraOffsetFrame) && entry.cameraOffsetFrame >= 0 ? entry.cameraOffsetFrame : 0} : {}),
 			name: typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : `Shot ${index + 1}`,
 			startFrame,
 			endFrame,
@@ -267,12 +271,14 @@ function repairShared(parsed, frameCount, ids) {
  * Build a transport-neutral shot document. It can live at the root today or
  * be nested under a future Scene document without changing its schema.
  */
-export function createShotAuthoringDocument({ shots = [], waypoints = [], frameCount = null } = {}) {
+export function createShotAuthoringDocument({ shots = [], waypoints = [], frameCount = null, cameras = [] } = {}) {
 	const repairedFrameCount = repairFrameCount(frameCount);
 	const effectiveFrameCount = repairedFrameCount ?? DEFAULT_FRAME_COUNT;
 	const ids = new Set();
+	const library = normalizeSceneCameras(cameras);
 	return {
 		version: SHOT_AUTHORING_VERSION,
+		...(library.length ? {cameras:library} : {}),
 		frameCount: repairedFrameCount,
 		waypoints: repairWaypoints(waypoints, ids),
 		shots: repairShots(shots, effectiveFrameCount, null, ids),
@@ -312,11 +318,13 @@ export function readShotAuthoringDocument(raw) {
 		};
 	}
 	const ids = new Set();
+	const cameras = normalizeSceneCameras(parsed.cameras);
 	return {
 		// A v3 body is structurally current but was authored on the old clock;
 		// it is rewritten, so it reports as migrated, not valid.
 		status: version < SHOT_AUTHORING_VERSION ? "migrated" : "valid",
-		state: { ...repairShared(parsed, frameCount, ids), shots: repairShots(parsed.shots, effectiveFrameCount, null, ids) },
+		state: { ...repairShared(parsed, frameCount, ids), shots: repairShots(parsed.shots, effectiveFrameCount, null, ids),
+			...(cameras.length ? {cameras} : {}) },
 	};
 }
 

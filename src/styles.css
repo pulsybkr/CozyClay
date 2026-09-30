@@ -11558,3 +11558,13 @@ input[type=range] {
 .facial-track strong { font-size: 11px; font-weight: 600; }
 .facial-track > div button { padding: 2px 7px; }
 .facial-editor [role="alert"] { color: #efb580; }
+
+.scene-cameras { display: grid; gap: 8px; padding-bottom: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--line2); }
+.scene-cameras h3 { margin: 0; }
+.scene-camera-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.scene-camera-buttons button { padding: 5px 8px; border: 1px solid var(--line2); border-radius: 4px; background: var(--card2); color: var(--fg); cursor: pointer; font: inherit; }
+.scene-camera-buttons button:disabled { opacity: .45; cursor: default; }
+.scene-camera-key-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.scene-camera-key-fields label { display: grid; gap: 3px; font-size: 10px; color: var(--muted); }
+.scene-cameras input { min-width: 0; width: 100%; border: 1px solid var(--line2); border-radius: 4px; padding: 5px; background: var(--card2); color: var(--fg); }
+.scene-camera-error { color: #efb580; }
