@@ -66,3 +66,12 @@ Preuves conservées : `docs/qa/library/01-library-pane.png`, `02-library-results
 - **La page de résultats est bornée.** Le reçu de commande refuse au-delà de 8 Kio, donc l'étagère demande 8 modèles par recherche. Mesuré sur le catalogue réel : 8 lignes ≈ 5 Kio, 12 lignes ≈ 8,1 Kio. Élargir demanderait le curseur de détail du bus, pas un relèvement de la limite.
 - Les vignettes viennent du CDN de la bibliothèque : sans réseau, les cartes s'affichent avec un substitut, le modèle restant téléchargeable.
 - Un modèle animé est placé dans sa pose de référence ; la carte l'annonce.
+
+## Notes d'environnement (Windows)
+
+Rencontrées pendant la mise au point, à connaître pour rejouer ces vérifications :
+
+- La clé se passe à l'environnement du serveur, jamais à un fichier : définir `POLY_PIZZA_API_KEY` dans la session avant de lancer `node tools/dev-full.mjs`. Sans clé, la recherche répond `503` avec la variable à définir — c'est le comportement attendu, pas une panne.
+- Le test navigateur écrit son entrée avec `Input.insertText`. Une frappe caractère par caractère via `dispatchKeyEvent` en perd sous un moteur occupé, et le panneau se fait alors accuser d'avoir cherché le mauvais mot.
+- Dans la suite complète, `mcp/verify-import-mesh.mjs` échoue sur cet environnement Windows (il attend un chemin POSIX `/tmp/...`). L'échec est **antérieur** à ces changements : vérifié en remettant l'arbre de côté (`git stash`).
+- `test/verify-studio-agent-protocol.mjs` échouait aussi sur la branche avant ces travaux (le catalogue VRM compte quatre modèles, l'attente en codait deux).
