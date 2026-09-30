@@ -207,6 +207,8 @@ const entity = object({ id, kind: choices(["object", "character", "rig"]), token
 	libraryKind: id, renderer: id, color: nullable(text(32)), tint: nullable(text(32)), modelId: nullable(text(120)), assetId: id, parentId: nullable(id), attachment: nullable(object({ characterId: id, bone: nullable(id) })), pathPointCount: integer(0, 64),
 	motion: object({ takeId: nullable(id), frames: integer(), ikKeyCount: integer(), promptBlockCount: integer() }, { poseId: nullable(id), keyIds: ids(8, 0) }),
 	capabilities: object({ rigReady: bool, ik: bool, measuredFeet: bool }),
+	expressionCapabilities: object({ status: choices(["loading", "ready", "unsupported"]),
+		available: array(object({ name: text(128), isBinary: bool }), 64), total: integer(), truncated: bool }),
 });
 // One compact row per entity, so the model sees the whole scene even when
 // only 24 rows carry full detail.

@@ -1,5 +1,11 @@
 # Expressions faciales VRM
 
+## Découverte par l’agent web
+
+Les personnages retournés par `inspect_studio` exposent maintenant `expressionCapabilities` : état `loading`, `ready` ou `unsupported`, noms disponibles avec leur caractère binaire, nombre total et indication de troncature. L’agent doit relire ces capacités après un changement de modèle, puis utiliser uniquement les noms disponibles. Il peut ainsi choisir `happy` pour un sourire sans demander à l’utilisateur le nom technique.
+
+Vérification : `test/qa-agent-vrm-expressions.mjs` charge les deux VRM fournis, lit leurs capacités par la connexion réelle de l’agent et applique une piste `happy` via `character.set`. Le sourire affiché et sa présence dans le document sont vérifiés. Aucun appel LLM payant n’est nécessaire pour ce test.
+
 ## Utilisation
 
 Dans l’inspecteur d’un personnage VRM, ouvrir **Expressions faciales**. La liste vient de l’avatar chargé, y compris ses expressions personnalisées et binaires.

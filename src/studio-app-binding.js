@@ -11,6 +11,8 @@ import { createStudioCommandJournal, framingChecks, placementChecks, studioObjec
 import { verifyInstalledTake } from "./studio-agent-motion.js";
 import { STUDIO_TOOL_FAMILIES, StudioProtocolError, validateReceipt, validateStudioCommand, validateStudioIdentity } from "./studio-agent-protocol.js";
 import { CONTACT_SHEET_LAYOUT, buildContactSheet, sampleContactSheetFrames } from "./studio-contact-sheet.js";
+import { vrmRuntime, supportedVrmExpressions } from "./vrm-runtime.js";
+import { isVrmModel } from "./character-models.js";
 
 // App-owned adapter: the shared command modules remain the only
 // planners and validators. Ports below publish through the native editor stores.
@@ -116,11 +118,15 @@ export function createStudioAppBinding(ports) {
 	function entityProjection(s) {
 		return [...s.characters.map(c => {
 			const t = s.targets.get(c.id);
+			const expressions = supportedVrmExpressions(t?.rig);
+			const available = expressions.filter(entry => entry.name.length <= 128).slice(0, 64);
 			return { id: c.id, kind: "character", token: tokens.get(c.id).token, name: c.subject || c.id,
 				position: { x: c.x, y: c.y ?? 0, z: c.z }, yawDeg: c.rot ?? 0, scale: c.scale ?? 1, tint: c.tint ?? null, modelId: c.model ?? null,
 				motion: { takeId: t?.motion?.studioTakeId ?? null, frames: t?.motion?.frames ?? 0,
 					ikKeyCount: t?.ikState?.keys.size ?? 0, promptBlockCount: c.layer?.promptClips?.length ?? 0 },
-				capabilities: { rigReady: Boolean(t?.rig), ik: Boolean(t?.rig?.userData?.poseBind), measuredFeet: false } };
+				capabilities: { rigReady: Boolean(t?.rig), ik: Boolean(t?.rig?.userData?.poseBind), measuredFeet: false },
+				expressionCapabilities: { status: !t?.rig && isVrmModel(c.model) ? "loading" : vrmRuntime(t?.rig) ? "ready" : "unsupported",
+					available, total: expressions.length, truncated: available.length < expressions.length } };
 		}), ...s.objects.map(o => ({ id: o.id, kind: "object", token: tokens.get(o.id).token, name: o.name || o.id,
 			position: { x: o.x, y: o.y ?? 0, z: o.z }, yawDeg: o.rot ?? 0,
 			rotationDeg: { x: o.rotX ?? 0, y: o.rot ?? 0, z: o.rotZ ?? 0 }, scale: { x: o.scaleX, y: o.scaleY, z: o.scaleZ },
