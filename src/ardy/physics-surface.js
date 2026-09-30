@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { findBone } from "./ik.js";
+import { canonicalBoneName } from "../humanoid-rig.js";
+import { syncVrm } from "../vrm-runtime.js";
 
 // Extra measured patches are not IK handles. They let a seated/lying body
 // support itself without pretending its feet are planted.
@@ -28,7 +30,7 @@ export function createSurfaceSampler(rig, sites) {
 		const vertices = [], byKey = new Map(), lists = Object.fromEntries(measured.map((s) => [s.id, []]));
 		for (let v = 0; v < index.count; v += 1) {
 			const ids = [0, 1, 2, 3].map((j) => index.getComponent(v, j)), weights = [0, 1, 2, 3].map((j) => weight.getComponent(v, j));
-			const memberships = measured.filter((s) => ids.reduce((sum, id, j) => sum + (s.match.test(mesh.skeleton.bones[id]?.name ?? "") ? weights[j] : 0), 0) >= .5);
+			const memberships = measured.filter((s) => ids.reduce((sum, id, j) => sum + (s.match.test(canonicalBoneName(mesh.skeleton.bones[id])) ? weights[j] : 0), 0) >= .5);
 			if (!memberships.length) continue;
 			inputVertices += 1;
 			const p = [position.getX(v), position.getY(v), position.getZ(v)];
@@ -52,6 +54,7 @@ export function createSurfaceSampler(rig, sites) {
 		if (p.y < item.floor) { item.floor = p.y; item.point.copy(p); }
 	};
 	const sample = () => {
+		syncVrm(rig);
 		rig.updateMatrixWorld(true);
 		const out = {};
 		for (const site of measured) {

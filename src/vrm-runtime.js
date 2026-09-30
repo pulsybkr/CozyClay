@@ -5,6 +5,8 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { CSKEL27_JOINTS } from "./ardy/cskel27.js";
 import { CSKEL27_NEUTRAL } from "./ardy/cskel27-neutral.js";
 import { globalRotations } from "./ardy/convert.js";
+import { primeBindPose } from "./poses.js";
+import { VRM_PHYSICS_BONES } from "./humanoid-rig.js";
 
 // Runtime objects must never enter userData: Object3D.clone JSON-serializes it.
 const runtimes = new WeakMap();
@@ -26,11 +28,35 @@ export async function loadVrm(url) {
 	const gltf = await loader.loadAsync(url);
 	const vrm = gltf.userData.vrm;
 	if (!vrm) throw new Error("The file does not contain a VRM avatar.");
+	// Record the public humanoid's rest conversion before VRM0 rotates its scene.
+	// Private evaluation clones use these bases to sync the borrowed skinned mesh.
+	const syncPairs = Object.entries(vrm.humanoid.normalizedHumanBones).map(([name, { node }]) => {
+		const raw = vrm.humanoid.getRawBoneNode(name);
+		raw.parent.updateWorldMatrix(true, false);
+		return { node, raw, parentBind: raw.parent.getWorldQuaternion(new THREE.Quaternion()), rawBind: raw.quaternion.clone() };
+	});
 	VRMUtils.rotateVRM0(vrm);
 	// Secondary motion is deliberately disabled until fixed-step export is supported.
 	vrm.springBoneManager?.reset();
 	const rig = vrm.scene;
 	rig.userData.characterFormat = "vrm";
+	for (const [core, name] of VRM_PHYSICS_BONES) {
+		const normalized = vrm.humanoid.getNormalizedBoneNode(name), raw = vrm.humanoid.getRawBoneNode(name);
+		if (normalized) normalized.userData.studioBoneName = `mixamorig${core}`;
+		if (raw) raw.userData.studioRawBoneName = `mixamorig${core}`;
+	}
+	// Upper chest/chest are optional in VRM. Explicit aliases keep the spine
+	// vocabulary usable without inventing bones or deforming the hierarchy.
+	for (const [core, names] of [['Spine1',['chest','spine']],['Spine2',['upperChest','chest','spine']]]) {
+		const node = names.map(name => vrm.humanoid.getNormalizedBoneNode(name)).find(Boolean);
+		if (node && node.userData.studioBoneName !== `mixamorig${core}`)
+			node.userData.studioBoneAliases = [...(node.userData.studioBoneAliases ?? []), `mixamorig${core}`];
+	}
+	primeBindPose(rig);
+	for (const side of ['left','right']) {
+		const arm = vrm.humanoid.getNormalizedBoneNode(`${side}UpperArm`);
+		if (arm) arm.userData.studioRestQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1), side === 'left' ? -1.2 : 1.2).toArray();
+	}
 	rig.updateMatrixWorld(true);
 	const hips = vrm.humanoid.getNormalizedBoneNode("hips");
 	const leftFoot = vrm.humanoid.getNormalizedBoneNode("leftFoot");
@@ -62,7 +88,7 @@ export async function loadVrm(url) {
 			node.frustumCulled = false;
 		}
 	});
-	const runtime = { vrm, bones, hips, hipsPosition, legRatio };
+	const runtime = { vrm, bones, hips, hipsPosition, legRatio, syncPairs, poseNodes: syncPairs.map(pair => pair.node) };
 	runtimes.set(rig, runtime);
 	return rig;
 }
@@ -124,8 +150,35 @@ export function applyVrmMotionFrame(rig, motion, frame) {
 export function snapshotVrmBones(rig) {
 	const runtime = vrmRuntime(rig);
 	if (!runtime) return null;
-	return runtime.bones.map(({ node }) => [node, node.quaternion.x, node.quaternion.y, node.quaternion.z, node.quaternion.w, node.position.x, node.position.y, node.position.z]);
+	return runtime.poseNodes.map(node => [node, node.quaternion.x, node.quaternion.y, node.quaternion.z, node.quaternion.w, node.position.x, node.position.y, node.position.z]);
 }
+
+/** Attach only the normalized-body playback runtime to a SkeletonUtils clone.
+ * Assets are borrowed; the clone never owns the live VRM or expression manager.
+ */
+export function attachVrmEvaluationClone(source, clone) {
+	const runtime = vrmRuntime(source);
+	if (!runtime) return false;
+	const original = [], copies = [];
+	source.traverse(node => original.push(node)); clone.traverse(node => copies.push(node));
+	const map = new Map(original.map((node,i) => [node,copies[i]]));
+	const pairs = runtime.syncPairs.map(pair => ({ ...pair, node: map.get(pair.node), raw: map.get(pair.raw) }));
+	const humanoid = { update() {
+		for (const {node,raw,parentBind,rawBind} of pairs) {
+			raw.quaternion.copy(parentBind).invert().multiply(node.quaternion).multiply(parentBind).multiply(rawBind);
+			if (node === map.get(runtime.hips)) {
+				raw.parent.updateWorldMatrix(true, false);
+				raw.position.copy(raw.parent.worldToLocal(node.getWorldPosition(new THREE.Vector3())));
+			}
+		}
+	} };
+	runtimes.set(clone, { ...runtime, vrm: { humanoid },
+		bones: runtime.bones.map(bone => ({ ...bone, node: map.get(bone.node) })),
+		hips: map.get(runtime.hips), syncPairs: pairs, poseNodes: runtime.poseNodes.map(node => map.get(node)) });
+	return true;
+}
+
+export function releaseVrmEvaluationClone(rig) { runtimes.delete(rig); }
 
 export function disposeVrm(rig) {
 	if (!rig) return;

@@ -2380,10 +2380,16 @@ export default function App() {
 	appContext.publishScenes(scenes);
 	activeSceneIdRef.current = activeSceneId;
 	shotDocumentRef.current = createShotAuthoringDocument({ shots, waypoints, frameCount: tlFrameCount });
+	const persistedCharacters = characters.map(({ sessionMotion, ...entry }) => {
+		if (!entry.motionRef) return entry;
+		const { correctionKeys: previous, ...motionRef } = entry.motionRef;
+		const correctionKeys = appContext.storeDomain('motion')?.layer(entry.id).ikKeys ?? [];
+		return { ...entry, motionRef: { ...motionRef, ...(correctionKeys.length ? { correctionKeys } : {}) } };
+	});
 	actorStageRef.current = {
 		// sessionMotion is stripped: generated clips are session-only and far
 		// too heavy for the stage envelope; paths and prompt blocks persist.
-		characters: characters.map(({ sessionMotion, ...entry }) => entry),
+		characters: persistedCharacters,
 		hasCharSheet,
 		environmentImage,
 		shotAspect: shotAspectKey,
@@ -6283,7 +6289,7 @@ export default function App() {
 		(async () => {
 			try {
 				await executeMotionJob(next);
-				next.commandCompletion?.resolve();
+				next.commandCompletion?.resolve(next.vrmCollisionReport);
 				setGenQueue((queue) => queue.map((job) => (job.id === next.id ? { ...job, status: "done" } : job)));
 			} catch (err) {
 				next.commandCompletion?.reject(err);
@@ -6413,6 +6419,8 @@ export default function App() {
 			const snapshot = snapshotPlaybackBones(target.rig);
 			try {
 				if (target.motion) applyMotionFrame(target.rig, target.motion, sampleAt({ frameCount: target.motion.frames, motion: target.motion }, null, frame).motionFrame);
+				const resolved = resolveIkRig(target.rig);
+				if (resolved && target.ikState?.keys.size) ikEvaluate(resolved.chains, target.ikState, frame, resolved.fkJoints, target.motion ? IK_CORRECTION_BLEND_FRAMES : 0);
 				target.rig.updateWorldMatrix(true, true);
 				const box = new THREE.Box3().setFromObject(target.rig, true);
 				const transform = c => new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.y ?? 0, c.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (c.rot ?? 0) * Math.PI / 180), new THREE.Vector3().setScalar(c.scale ?? 1));

@@ -1,0 +1,15 @@
+{
+  "test": "test/qa-vrm-generation-review.mjs",
+  "result": "passed",
+  "generationReview": {
+    "evaluatedFrames": 48,
+    "correctedFrames": 48,
+    "unresolved": [],
+    "scope": "self-collision-arms",
+    "skipped": false
+  },
+  "manualReview": "Reviewed 48 frames; corrected 0; 0 frames with residual proxy contacts.",
+  "undoRestoresEmptyTake": true,
+  "projectRoundtripCorrectionKeys": 48,
+  "newGpuRequests": 0
+}

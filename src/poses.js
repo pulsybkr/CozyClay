@@ -142,7 +142,7 @@ export function primeBindPose(root) {
 	if (!root || root.userData?.poseBind) return;
 	const map = new Map();
 	root.traverse((object) => {
-		if (object.isBone) {
+		if (object.isBone || object.userData?.studioBoneName) {
 			const q = object.quaternion;
 			const p = object.position;
 			map.set(object, {

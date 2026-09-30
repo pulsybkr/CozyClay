@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { normalizeBoneName, POSE_BONES, DEFAULT_POSE } from "../poses.js";
+import { isPoseBone, canonicalBoneName } from "../humanoid-rig.js";
+import { syncVrm } from "../vrm-runtime.js";
 
 /**
  * Frame-based IK layer for direct character posing, following the DCC
@@ -88,7 +90,7 @@ export function hasBindPose(rig) {
  * transform for anything the snapshot does not cover (the mesh nodes, and every
  * bone on a rig that was never primed). */
 function bindLocalMatrix(rig, node, out, delta = null) {
-	const saved = node.isBone ? rig.userData?.poseBind?.get(node) : null;
+	const saved = rig.userData?.poseBind?.get(node);
 	if (saved) {
 		bindPosition.set(saved.position?.x ?? 0, saved.position?.y ?? 0, saved.position?.z ?? 0);
 		bindQuaternion.set(saved.x, saved.y, saved.z, saved.w);
@@ -151,6 +153,14 @@ function restDeltas(rig) {
 		return none;
 	}
 	const matchesByJoint = new Map();
+	if (rig.userData?.characterFormat === 'vrm') {
+		const deltas = new Map();
+		rig.traverse(node => {
+			if (node.userData?.studioRestQuaternion) deltas.set(node, new THREE.Quaternion().fromArray(node.userData.studioRestQuaternion));
+		});
+		restDeltaCache.set(rig, deltas);
+		return deltas;
+	}
 	rig.traverse((node) => {
 		if (!node.isBone) return;
 		const normalized = normalizeBoneName(node.name);
@@ -251,7 +261,7 @@ export function measureContactRadii(rig) {
 		const bone = findBone(rig, `mixamorig${name}`);
 		if (!bone) continue;
 		const start = bindPose ? bindWorldPosition(rig, bone) : bone.getWorldPosition(new THREE.Vector3());
-		const child = (name === "Hips" || name === "Head") ? null : bone.children.find((node) => node.isBone);
+		const child = (name === "Hips" || name === "Head") ? null : bone.children.find(isPoseBone);
 		const end = child
 			? (bindPose ? bindWorldPosition(rig, child) : child.getWorldPosition(new THREE.Vector3()))
 			: start.clone();
@@ -269,7 +279,7 @@ export function measureContactRadii(rig) {
 		const weights = mesh.geometry.attributes.skinWeight;
 		if (!indices || !weights) return;
 		const distances = new Map(CONTACT_JOINTS.map((name) => [name, []]));
-		const names = mesh.skeleton.bones.map((bone) => normalizeBoneName(bone.name));
+		const names = mesh.skeleton.bones.map((bone) => normalizeBoneName(canonicalBoneName(bone)));
 		const vertex = new THREE.Vector3();
 		for (let index = 0; index < indices.count; index += 1) {
 			let dominant = -1;
@@ -336,7 +346,7 @@ export function measureContactHeights(rig) {
 		const indices = mesh.geometry.attributes.skinIndex;
 		const weights = mesh.geometry.attributes.skinWeight;
 		if (!indices || !weights) return;
-		const names = mesh.skeleton.bones.map((bone) => normalizeBoneName(bone.name));
+		const names = mesh.skeleton.bones.map((bone) => normalizeBoneName(canonicalBoneName(bone)));
 		const vertex = new THREE.Vector3();
 		for (let index = 0; index < indices.count; index += 1) {
 			let dominant = -1;
@@ -415,12 +425,14 @@ const CHAINS = {
 };
 
 export function findBone(root, name) {
+	if (!root) return null;
 	const target = normalizeBoneName(name);
 	let found = null;
 	root.traverse((object) => {
-		if (found || !object.isBone) return;
-		const norm = normalizeBoneName(object.name);
-		if (norm === target || norm.endsWith(target)) found = object;
+		if (found || !isPoseBone(object)) return;
+		if (root.userData?.characterFormat === 'vrm' && !object.userData?.studioBoneName) return;
+		const names = [canonicalBoneName(object), ...(object.userData?.studioBoneAliases ?? [])];
+		if (names.some(name => { const norm = normalizeBoneName(name); return norm === target || norm.endsWith(target); })) found = object;
 	});
 	return found;
 }
@@ -848,6 +860,10 @@ export function ikRestore(rig, snapshot, fkJoints) {
 			joint.bone.updateMatrixWorld(true);
 		}
 	}
+	// Normalized VRM joints are controls; copy corrections to the raw skin bones
+	// after evaluation so playback, scrubbing and export render the same pose.
+	const owner = rig.values().next().value?.rig;
+	if (owner?.userData?.characterFormat === 'vrm') syncVrm(owner);
 }
 
 /**
@@ -1125,6 +1141,8 @@ export function ikEvaluate(rig, ikState, frame, fkJoints, blendWindow = 0) {
 			joint.bone.updateMatrixWorld(true);
 		}
 	}
+	const owner = rig.values().next().value?.rig;
+	if (owner?.userData?.characterFormat === 'vrm') syncVrm(owner);
 }
 
 /**

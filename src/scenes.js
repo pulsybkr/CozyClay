@@ -1,4 +1,5 @@
 import { validateExpressionTracks } from "./facial-expressions.js";
+import { normalizeCorrectionKeys } from "./motion/correction-keys.js";
 // Pure multi-scene document model. No three.js, no React.
 // A Scene is the set; shotDocument and stage are sealed department envelopes.
 // This module stores and copies those envelopes but never opens or validates them.
@@ -220,6 +221,8 @@ function normalizeMotionRef(ref) {
 	// An agent-installed take keeps the Studio take id its receipts name, so a
 	// reload still reports the same take. Optional, like calibration.
 	if (typeof ref.studioTakeId === "string" && ref.studioTakeId) normalized.studioTakeId = ref.studioTakeId;
+	const correctionKeys = normalizeCorrectionKeys(ref.correctionKeys);
+	if (correctionKeys.length) normalized.correctionKeys = correctionKeys;
 	return normalized;
 }
 

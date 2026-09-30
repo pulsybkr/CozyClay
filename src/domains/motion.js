@@ -74,6 +74,7 @@ import { DEFAULT_POSE, restoreBindPositions, applyPose, applyHipsOffset } from "
 import { normalizeMotionCalibration, applyMotionCalibration } from "../ardy/motion-calibration.js";
 import { collisionBlockers } from "../ardy/collision-blockers.js";
 import { fixCollisions, fixCollisionsRange } from "../ardy/fix-collisions.js";
+import { vrmRuntime } from "../vrm-runtime.js";
 import { trackFeature, startMotionRequest, motionPreflightReason, trackActivation } from "../analytics.js";
 import { buildArdyPose } from "../ardy/export.js";
 import { slateLine } from "../shot.js";
@@ -127,7 +128,7 @@ export function createMotionDomain(appContext, characters) {
 		const ref = entry.motionRef;
 		const take = ref ? { resourceId: `restore:${entry.id}:${ref.motionId ?? ref.url}`, url: ref.url ?? null, anchorX: ref.anchorX, anchorZ: ref.anchorZ,
 			rotationDeg: ref.rotationDeg, prompt: ref.prompt ?? '', ...(ref.studioTakeId ? { studioTakeId: ref.studioTakeId } : {}) } : null;
-		return { id: entry.id, take, fullTake: take, takeVersions: ref?.url ? [{ motionUrl: ref.url, recipe: null, savedAt: Date.now(), label: ko('Loaded', '불러옴') }] : [] };
+		return { id: entry.id, take, fullTake: take, ikKeys: ref?.correctionKeys ?? [], takeVersions: ref?.url ? [{ motionUrl: ref.url, recipe: null, savedAt: Date.now(), label: ko('Loaded', '불러옴') }] : [] };
 	});
 	function snapshotTake(take) {
 		if (!take) return null;
@@ -263,26 +264,36 @@ export function createMotionDomain(appContext, characters) {
 			}) } }));
 		synchronizeTimeline();
 	}
-	function fix(id, scope = 'frame') {
+	function fix(id, scope = 'frame', { automatic = false } = {}) {
 		const rig = rigFor(id), resolved = rig && resolveIkRig(rig);
 		if (!resolved) throw new StudioProtocolError('TARGET_NOT_READY', 'The character rig is not loaded.');
-		const state = appContext.shared.ikStatesRef.current.get(id) ?? { ...createIkState(), ...resolved };
+		// Use the authoritative layer, including a just-installed take whose
+		// cleared keys have not reached React's runtime buffers yet.
+		const keys = decodeMotionKeys(layer(id).ikKeys);
+		const state = { ...createIkState(), ...resolved, keys,
+			tracked: new Set([...keys.values()].flatMap(entry => [...entry.keys()])) };
 		const blockers = at => collisionBlockers({ rigs: appContext.shared.rigs, activeId: id, characterIds: appContext.live.characters,
 			sceneObjects: appContext.ports.read().objects, library: OBJECT_LIBRARY, frame: at, take: { frameCount: motionFor(id)?.frames ?? 1, fps: 24 } });
+		let report;
 		if (scope === 'clip') {
 			const take = motionFor(id); if (!take) throw new StudioProtocolError('TARGET_NOT_READY', 'Load a take first.');
 			const originals = rigSnapshots();
 			try {
-				fixCollisionsRange({ rig, ...resolved, ikState: state, startFrame: 0, endFrame: take.frames - 1,
+				const keyed = fixCollisionsRange({ rig, ...resolved, ikState: state, startFrame: 0, endFrame: take.frames - 1,
+					...(automatic ? { onlyChains: new Set(['leftHand','rightHand']) } : {}),
 					applyFrame(at) { applyMotionFrame(rig, take, at); ikEvaluate(resolved.chains, state, at, resolved.fkJoints, 6); },
-					blockersAt(at) { for (const row of read()) if (row.id !== id) appContext.shared.poseMemberAtFrame(rigFor(row.id), motionFor(row.id), appContext.shared.ikStatesRef.current.get(row.id), at, 6); return blockers(at); } });
+					blockersAt: automatic ? null : at => { for (const row of read()) if (row.id !== id) appContext.shared.poseMemberAtFrame(rigFor(row.id), motionFor(row.id), appContext.shared.ikStatesRef.current.get(row.id), at, 6); return blockers(at); } });
+				report = { evaluatedFrames: take.frames, correctedFrames: keyed.length, unresolved: keyed.unresolved ?? [] };
 			} finally { for (const snapshot of originals.values()) appContext.shared.restoreExportRig(snapshot); }
 		} else {
 			const result = fixCollisions(rig, resolved.chains, { ikState: state, fkJoints: resolved.fkJoints, blockers: blockers(frame()) });
 			if (!result.supported) throw new StudioProtocolError('TARGET_NOT_READY', 'This rig does not support collision cleanup.');
 			if (result.changed) ikBakeKeyframe(resolved.chains, state, frame(), resolved.fkJoints, result.touched, null, result.baseQuats);
+			report = { evaluatedFrames: 1, correctedFrames: result.changed ? 1 : 0,
+				unresolved: result.residual > 0 ? [{frame:frame(),depth:result.residual}] : [] };
 		}
 		setKeys(id, state.keys);
+		return report;
 	}
 	function bakeCurrentKey(id, at) {
 		const rig = rigFor(id), resolved = rig && resolveIkRig(rig);
@@ -1145,6 +1156,16 @@ export function useMotion(appContext) {
 		if (job) {
 			commitTakeRecipe(job, take.url);
 			if (job.hasBlockEdits) owned.writeLayer(characterId, { committedIkEdits: job.committedEditKeys });
+			if (vrmRuntime(appContext.shared.rigs[characterId])) {
+				if (job.hasBlockEdits || job.body?.posePin || job.body?.poseFrames?.length) {
+					job.vrmCollisionReport = { skipped: true, reason: 'authored-pose-constraints' };
+					appContext.notify('VRM collision correction skipped to preserve authored pose constraints; run a collision review explicitly.');
+				} else {
+					const report = owned.fix(characterId, 'clip', { automatic: true });
+					job.vrmCollisionReport = { ...report, scope: 'self-collision-arms', skipped: false };
+					appContext.notify(`VRM body collision review: ${report.correctedFrames} corrected frames; ${report.unresolved.length} frames with residual proxy contacts.`);
+				}
+			}
 		}
 		owned.persistTake(take, motionRef);
 	}

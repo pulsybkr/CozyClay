@@ -1,0 +1,44 @@
+[
+  {
+    "model": "sakura-vrm",
+    "beforeDepth": 0.17716393859635715,
+    "afterDepth": 0,
+    "changed": true,
+    "correctedFrames": 12,
+    "rangeDepth": 0,
+    "unresolved": 0,
+    "cloneError": 3.469446951953614e-16,
+    "evaluatedFrames": 48,
+    "status": "unverified",
+    "surfaceMeasured": true,
+    "limitations": [
+      "discrete-integer-24fps-frames",
+      "calibrated-capsule-and-upright-box-proxies",
+      "external-torso-head-and-other-cast-fingers-excluded",
+      "rest-overlap-calibration-and-4mm-actionable-depth",
+      "centroidal-support-not-biomechanical-certification",
+      "semantic-and-visual-review-unavailable"
+    ]
+  },
+  {
+    "model": "char-02-vrm",
+    "beforeDepth": 0.20218398636836984,
+    "afterDepth": 0,
+    "changed": true,
+    "correctedFrames": 12,
+    "rangeDepth": 0,
+    "unresolved": 0,
+    "cloneError": 5.661048867003676e-16,
+    "evaluatedFrames": 48,
+    "status": "unverified",
+    "surfaceMeasured": true,
+    "limitations": [
+      "discrete-integer-24fps-frames",
+      "calibrated-capsule-and-upright-box-proxies",
+      "external-torso-head-and-other-cast-fingers-excluded",
+      "rest-overlap-calibration-and-4mm-actionable-depth",
+      "centroidal-support-not-biomechanical-certification",
+      "semantic-and-visual-review-unavailable"
+    ]
+  }
+]

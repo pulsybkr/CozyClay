@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { StudioProtocolError, freezeStudioData } from './studio-agent-protocol.js';
 import { applyMotionFrame } from './ardy/playback.js';
-import { resolveIkRig, createIkState, ikEvaluate, findBone, hasBindPose } from './ardy/ik.js';
+import { resolveIkRig, createIkState, ikEvaluate, findBone, hasBindPose, shareContactMeasurements } from './ardy/ik.js';
 import { PHYSICS_LIMITS, createSupportSampler, copyPhysicsKeys, supportIntervals, physicsMetrics } from './ardy/physics-review.js';
 import { createDynamicsSampler, supportDiagnostics } from './ardy/physics-support.js';
 import { computeCenterOfMass } from './ardy/auto-physics.js';
@@ -14,11 +14,13 @@ import { createGroundSampler } from './ardy/ground.js';
 import { OBJECT_LIBRARY } from './scene-objects.js';
 import { objectTransformAt } from './object-path.js';
 import { sampleAt } from './sample-at.js';
+import { isPoseBone } from './humanoid-rig.js';
+import { attachVrmEvaluationClone, releaseVrmEvaluationClone } from './vrm-runtime.js';
 
 const PROFILE = 'studio-motion-v1', BLEND = 6;
 const fail = (code, message) => { throw new StudioProtocolError(code, message); };
 const copyLayer = state => ({ ...createIkState(), keys: copyPhysicsKeys(state?.keys ?? new Map()), tracked: new Set(state?.tracked ?? []) });
-const poseOf = rig => { const result = []; rig.traverse(n => { if (n.isBone) result.push({ bone: n, p: n.position.clone(), q: n.quaternion.clone(), s: n.scale.clone() }); }); return result; };
+const poseOf = rig => { const result = []; rig.traverse(n => { if (isPoseBone(n)) result.push({ bone: n, p: n.position.clone(), q: n.quaternion.clone(), s: n.scale.clone() }); }); return result; };
 const restore = pose => { for (const { bone, p, q, s } of pose) { bone.position.copy(p); bone.quaternion.copy(q); bone.scale.copy(s); } };
 const poseValues = pose => pose.map(({ bone }) => [...bone.position.toArray(), ...bone.quaternion.toArray(), ...bone.scale.toArray()]);
 const BASE_LIMITATIONS = ['discrete-integer-24fps-frames', 'calibrated-capsule-and-upright-box-proxies', 'external-torso-head-and-other-cast-fingers-excluded', 'rest-overlap-calibration-and-4mm-actionable-depth', 'centroidal-support-not-biomechanical-certification', 'semantic-and-visual-review-unavailable'];
@@ -33,6 +35,10 @@ function isolatedRig(source) {
     const bind = source.userData.poseBind.get(n);
     return bind ? [[nodes[i], structuredClone(bind)]] : [];
   }));
+  attachVrmEvaluationClone(source, rig);
+  // Rest measurements belong to the avatar, not to its current sampled pose.
+  resolveIkRig(source);
+  shareContactMeasurements(source, rig);
   const parent = new THREE.Group(); parent.matrixAutoUpdate = false;
   if (source.parent) parent.matrix.copy(source.parent.matrixWorld);
   parent.add(rig); parent.updateMatrixWorld(true);
@@ -41,6 +47,7 @@ function isolatedRig(source) {
   return { rig, parent, rest, ...resolved, surface: createSupportSampler(rig), dynamics: createDynamicsSampler(rig) };
 }
 function disposeRig(value) {
+  releaseVrmEvaluationClone(value.rig);
   // Geometry/material/texture assets are borrowed read-only. Only cloned
   // skeleton palettes and the private hierarchy belong to this evaluation.
   const skeletons = new Set(); value.rig.traverse(n => { if (n.isSkinnedMesh) skeletons.add(n.skeleton); });

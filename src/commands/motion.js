@@ -85,8 +85,9 @@ export function register(registry, ports) {
 			owner().writeLayer(args.characterId, { committedIkEdits: layer.committedIkEdits });
 			return result;
 		}) };
-		await owner().generate(args, generationContext);
-		return { affectedIds: [args.characterId], summary: 'Generated motion.' };
+		const collisionReview = await owner().generate(args, generationContext);
+		return { affectedIds: [args.characterId], summary: 'Generated motion.',
+			...(collisionReview ? { output: { collisionReview } } : {}) };
 	} });
 	for (const declaration of queued) registry.register({ ...declaration, available: mounted, run({ characterId }) {
 		characterOf(ports, characterId);
@@ -123,7 +124,11 @@ export function register(registry, ports) {
 	} }); } }, ports, edits[0]);
 	for (const declaration of edits.slice(1)) registry.register({ ...declaration, available: mounted, run(args) {
 		const { characterId } = args; characterOf(ports, characterId);
-		if (declaration.id === 'motion.fixCollisions') owner().fix(characterId, args.scope);
+		if (declaration.id === 'motion.fixCollisions') {
+			const report = owner().fix(characterId, args.scope);
+			return { affectedIds: [characterId],
+				summary: `Reviewed ${report.evaluatedFrames} frames; corrected ${report.correctedFrames}; ${report.unresolved.length} frames with residual proxy contacts.` };
+		}
 		else {
 			const current = take(characterId), full = owner().fullMotionFor(characterId);
 			let segments = current.editSegments;
