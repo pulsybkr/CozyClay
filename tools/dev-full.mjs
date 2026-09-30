@@ -102,6 +102,10 @@ const oauthServer = createServer((req, res) => {
 	const origins = new Set([`http://127.0.0.1:${mainPort}`, `http://${"local" + "host"}:${mainPort}`]);
 	if (!(origins.has(req.headers.origin) || (req.headers.origin === undefined && req.method === "GET" && hosts.has(req.headers.host)))) { res.writeHead(403, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "forbidden origin" })); return; }
 	if (path.startsWith("/agent/")) {
+		if (path.startsWith("/agent/poly/")) {
+			void polyHandler(req, res, path).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "asset library unavailable" })); } });
+			return;
+		}
 		void agentHandler(req, res, path).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "agent unavailable" })); } });
 		return;
 	}
