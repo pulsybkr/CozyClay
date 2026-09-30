@@ -74,8 +74,8 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.85.1",
-    "@earendil-works/pi-ai": "0.85.1"
+    "@earendil-works/pi-agent-core": "^0.99.1",
+    "@earendil-works/pi-ai": "^0.99.1"
   },
   "devDependencies": {
     "@mediapipe/tasks-vision": "0.10.17",
