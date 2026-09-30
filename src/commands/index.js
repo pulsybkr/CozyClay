@@ -17,8 +17,9 @@ import * as exporting from "./export.js";
 import * as ai from "./ai.js";
 import * as stage from "./stage.js";
 import * as vrm from './vrm.js';
+import * as library from './library.js';
 
-export const COMMAND_MODULES = Object.freeze({ shot, camera, cast, motion, objects, view, scene, project, export: exporting, ai, stage, vrm });
+export const COMMAND_MODULES = Object.freeze({ shot, camera, cast, motion, objects, view, scene, project, export: exporting, ai, stage, vrm, library });
 
 export function commandDeclarations(modules = COMMAND_MODULES) {
 	return Object.values(modules).flatMap(module => module.declarations.map(declaration => ({

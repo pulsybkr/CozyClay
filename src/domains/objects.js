@@ -16,6 +16,7 @@ import {
 	createCutoutObject,
 	CUTOUT_DEFAULT_HEIGHT,
 	createMeshObject,
+	normalizeObjectCredit,
 	CUTOUT_KIND,
 	duplicateCutoutOptions,
 	MESH_KIND,
@@ -38,6 +39,7 @@ import {
 import { rememberAsset, assetRecord } from "../scene-asset-cache.js";
 import { importImageFile, assetAspect, openAssetDb, putAsset } from "../scene-assets.js";
 import { importMeshFile, compressedGlbReason, meshBoundsFromAsset, fitMeshBounds } from "../scene-mesh.js";
+import { resolvePolyObjectHeight } from "../poly-pizza.js";
 import { cutOutBackground, maskAsset } from "../matte.js";
 import { parseRigNodeId } from "../hierarchy-model.js";
 import { StudioProtocolError } from "../studio-agent-protocol.js";
@@ -369,6 +371,57 @@ export function useObjects(appContext) {
 		if (args.assetId) return args.placeAs === "mesh" ? spawnMeshAt(args.assetId, args.placement, context) : spawnCutoutAt(args.assetId, args.placement, context);
 		return importCommandAsset(args, context);
 	};
+
+	/**
+	 * A model downloaded from the 3D library: the bytes are already in hand and
+	 * the credit travels with the object.
+	 *
+	 * The download itself belongs to the command layer, because that is the one
+	 * cross-origin call the browser may make on its own (the library's CDN allows
+	 * it, its search API does not). Everything after the bytes arrive is the very
+	 * same path a GLB dropped on the Assets shelf takes — measured once, stored in
+	 * the asset store, and stood on the floor in front of the shot camera when no
+	 * placement is asked for.
+	 */
+	async function importLibraryModel(args, commandContext) {
+		const { bytes, name } = args;
+		if (!(bytes instanceof ArrayBuffer) || !bytes.byteLength) throw new StudioProtocolError("INVALID_ARGUMENT", "The downloaded model has no bytes.");
+		const type = typeof args.type === "string" && args.type ? args.type : "model/gltf-binary";
+		const credit = normalizeObjectCredit(args.credit);
+		let asset;
+		let height;
+		let footprint;
+		try {
+			({ asset, height, footprint } = await importMeshFile(new File([bytes], name || "model.glb", { type })));
+		} catch (error) {
+			throw new StudioProtocolError("INVALID_ARGUMENT", `Could not import that model: ${error.message}`);
+		}
+		await persistMeshAsset(asset);
+		// Sizing policy lives here, not in the command, so there is ONE commit:
+		// the file's own measurement wins when it is trustworthy, an explicit
+		// height overrides it, and the kind's hint fills in when the measurement
+		// is only the 1 m fallback the import heuristic produces for a file
+		// authored in centimetres or city units.
+		const fitted = resolvePolyObjectHeight({ measured: height, hint: args.heightHint, requested: args.height });
+		const placement = args.placement ?? placementInFrontOfShot();
+		let object = createMeshObject(
+			{ assetId: asset.id, height: fitted, footprint, name: meshNameFromFile(args.displayName || name), credit },
+			domain.read(),
+			placement,
+		);
+		if (!object) throw new StudioProtocolError("INVALID_ARGUMENT", "Could not create the model object.");
+		// A requested y lifts the model onto a surface instead of standing it on
+		// the deck, and it rides the same single commit.
+		if (Number.isFinite(args.y)) object = updateSceneObject([object], object.id, { y: args.y })[0];
+		const published = publishImported(object, commandContext);
+		appContext.notify(
+			isKo
+				? `${object.name} 추가됨 — 실제 높이(m)를 입력하면 크기가 맞습니다`
+				: `${object.name} added — type its real height in metres to set the scale`,
+		);
+		return { ...published, objectId: object.id, name: object.name, height: object.height, footprint: object.footprint, credit };
+	}
+	domain.importLibraryModel = importLibraryModel;
 	domain.applyMatte = applyMatte;
 
 	function meshNameFromFile(fileName) {

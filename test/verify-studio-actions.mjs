@@ -24,8 +24,11 @@ const exportActions = ["export.shotVideo"];
 const sceneActions = ["scene.create", "scene.duplicate", "scene.rename", "scene.delete", "scene.switch"];
 const projectActions = ["project.save"];
 const assetActions = ["asset.import"];
+// The 3D library: a search authors nothing (a read the agent may repeat), and a
+// download is a job that makes the same authored edit asset.import makes.
+const libraryActions = ["asset.searchLibrary", "asset.downloadLibraryModel"];
 const aiActions = ["ai.prepareShot", "motion.generateFromVideo"];
-assert.deepEqual([...STUDIO_ACTION_IDS].sort(), [...firstBatch, ...waypointActions, ...ikKeyActions, ...attachActions, ...railActions, ...viewActions, ...exportActions, ...sceneActions, ...projectActions, ...assetActions, ...aiActions].sort());
+assert.deepEqual([...STUDIO_ACTION_IDS].sort(), [...firstBatch, ...waypointActions, ...ikKeyActions, ...attachActions, ...railActions, ...viewActions, ...exportActions, ...sceneActions, ...projectActions, ...assetActions, ...libraryActions, ...aiActions].sort());
 assert.deepEqual([...STUDIO_ACTION_KINDS], ["mutation", "transient", "job", "document"]);
 assert.ok(Object.isFrozen(STUDIO_ACTIONS));
 for (const action of STUDIO_ACTIONS) {
