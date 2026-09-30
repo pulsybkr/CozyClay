@@ -7,6 +7,10 @@ import { assetAspect, isMeshAssetId, isSupportedMeshType } from "./scene-assets.
 import { assetKind, formatAssetBytes } from "./asset-shelf.js";
 import { assetRecord } from "./scene-asset-cache.js";
 import ResourceStatus from "./resource-status.jsx";
+// The 3D library lives in the shelf, beside the cast and the props: it is a
+// source of set pieces like every other section here, and it reaches the bus
+// through AppContext exactly as the panels do.
+import AssetLibraryPane from "./asset-library-pane.jsx";
 
 /** Casting assets offered in the bottom Assets tab. `id` doubles as the FBX
  * file stem and the ARDY wire rig name (see scenes.js). */
@@ -356,7 +360,7 @@ function StorageManager({ unusedAssetIds, usedAssetIds, usageCounts, graphSignat
  * flight, then the SOURCE ids (see asset-shelf.js) — derived mattes and cut
  * renders never reach this component. Mesh ids are the imported GLBs.
  */
-export default function AssetPane({ onAssetGrab, imageAssetIds, meshAssetIds = null, manageStorage, onManageStorageToggle, unusedAssetIds, usedAssetIds, usageCounts, graphSignature, trashCount, onDeleteUnusedAsset, onUndoDelete, deletingAssetId, resourceManifest }) {
+export default function AssetPane({ onAssetGrab, imageAssetIds, meshAssetIds = null, manageStorage, onManageStorageToggle, unusedAssetIds, usedAssetIds, usageCounts, graphSignature, trashCount, onDeleteUnusedAsset, onUndoDelete, deletingAssetId, resourceManifest, onLibraryPlaced }) {
 	return (
 		<div className="assets-shelf">
 			{resourceManifest ? <ResourceStatus manifest={resourceManifest} compact /> : null}
@@ -445,6 +449,10 @@ export default function AssetPane({ onAssetGrab, imageAssetIds, meshAssetIds = n
 						</div>
 					)}
 				</section>
+				{/* Last, because it is the only section that reaches the network: a
+				    shelf that opens instantly and then fills in beats one that waits on
+				    a search before showing anything at all. */}
+				<AssetLibraryPane onPlaced={onLibraryPlaced} />
 			</>}
 		</div>
 	);
