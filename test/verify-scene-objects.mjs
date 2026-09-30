@@ -1172,6 +1172,60 @@ const fallingOnChild = { ...createSceneObject("sphere", [hiddenTable, hiddenChil
 const landedOnChild = dropToSurfacePatch(fallingOnChild, [hiddenTable, hiddenChild]);
 expect("a drop does not land on a child of a hidden parent", landedOnChild && landedOnChild.y === 0, JSON.stringify(landedOnChild));
 
+/* ----------------------------------------------------------- provenance ---- */
+// A downloaded model carries the credit its licence obliges us to show. It is
+// repaired on the way in, on the way out of storage, and through a patch — a
+// half-written credit would still read as authoritative.
+const credit = {
+	library: "poly.pizza",
+	id: "iMNqRzPwwe",
+	title: "Chair",
+	creator: "Quaternius",
+	license: "CC0 1.0",
+	licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+	sourceUrl: "https://poly.pizza/m/iMNqRzPwwe",
+	attribution: '"Chair" by Quaternius, https://poly.pizza/m/iMNqRzPwwe.',
+};
+const creditMesh = createMeshObject({ assetId: "mesh-asset-chair", height: 0.9, footprint: { width: 0.5, depth: 0.5 }, name: "Chair", credit });
+expect("a mesh keeps the credit it was imported with", creditMesh.credit && creditMesh.credit.creator === "Quaternius", JSON.stringify(creditMesh.credit));
+expect("a mesh without provenance carries no credit field at all", !("credit" in createMeshObject({ assetId: "mesh-asset-plain", height: 1 })), "unattributed import");
+expect("a copy of a downloaded model keeps its credit", duplicateMeshOptions(creditMesh).credit.creator === "Quaternius", JSON.stringify(duplicateMeshOptions(creditMesh)));
+expect("a duplicated downloaded model is credited, not anonymous", createMeshObject(duplicateMeshOptions(creditMesh), [creditMesh]).credit.id === "iMNqRzPwwe", "duplicate");
+expect("the credit survives a round trip through storage", normalizeSceneObject(JSON.parse(JSON.stringify(creditMesh))).credit.creator === "Quaternius", "round trip");
+
+// Storage is never trusted: a credit with no library or id, or with a
+// javascript: URL, must not come back as a citation.
+const brokenCredits = [
+	{},
+	null,
+	"a string",
+	[],
+	{ library: "poly.pizza" },
+	{ id: "iMNqRzPwwe" },
+	{ library: "", id: "iMNqRzPwwe" },
+];
+for (const broken of brokenCredits) {
+	const stored = normalizeSceneObject({ ...creditMesh, credit: broken });
+	expect(`an unusable credit (${JSON.stringify(broken)}) is dropped, not cited`, stored && !("credit" in stored), JSON.stringify(stored?.credit));
+}
+// A credit that NAMES a model but whose links are hostile keeps the claim and
+// loses the links: the id still has to be citable, and a javascript: URL in a
+// scene file must never survive to be rendered as a link.
+const escapedCredit = normalizeSceneObject({ ...creditMesh, credit: { ...credit, sourceUrl: "javascript:alert(1)", licenseUrl: "data:text/html,x" } });
+expect("a hostile credit keeps its identity", escapedCredit.credit.id === "iMNqRzPwwe", JSON.stringify(escapedCredit.credit));
+expect("a javascript: source link is emptied, not kept", escapedCredit.credit.sourceUrl === "", JSON.stringify(escapedCredit.credit));
+expect("a non-http license link is emptied rather than kept", escapedCredit.credit.licenseUrl === "", JSON.stringify(escapedCredit.credit));
+expect("a real credit keeps its links", normalizeSceneObject(JSON.parse(JSON.stringify(creditMesh))).credit.sourceUrl === "https://poly.pizza/m/iMNqRzPwwe", "links");
+expect("a credit with no stated licence reads as Unknown", normalizeSceneObject({ ...creditMesh, credit: { library: "poly.pizza", id: "x1" } }).credit.license === "Unknown", "unknown licence");
+
+// The patch path is how an agent or the inspector attaches provenance later.
+const patchedCredit = updateSceneObject([createMeshObject({ assetId: "mesh-asset-chair", height: 1 })], "mesh", { credit })[0];
+expect("a patch can attach provenance to an existing model", patchedCredit.credit && patchedCredit.credit.id === "iMNqRzPwwe", JSON.stringify(patchedCredit.credit));
+const clearedCredit = updateSceneObject([patchedCredit], "mesh", { credit: null })[0];
+expect("a patch can clear provenance", clearedCredit.credit == null, JSON.stringify(clearedCredit.credit));
+const unreadableCredit = updateSceneObject([patchedCredit], "mesh", { credit: { library: "poly.pizza" } })[0];
+expect("a patch cannot install an unreadable credit", unreadableCredit.credit == null, JSON.stringify(unreadableCredit.credit));
+
 // The grouping and attachment sections run after the first gate above, so they
 // need their own — otherwise a failure here would print FAIL and still exit 0.
 if (failures) process.exit(1);

@@ -147,6 +147,72 @@ export function normalizePolySearch(payload) {
 	});
 }
 
+/**
+ * A filesystem-safe file name for a downloaded model. The name is what a mesh
+ * object displays and what ".glb" keys off downstream, so a title full of
+ * punctuation must still produce a name the studio and the OS both accept.
+ */
+export function polyFileName(model) {
+	const base = text(model?.title, MAX_TITLE)
+		.replace(/[\\/:*?"<>|]+/g, " ")
+		.replace(/\s+/g, " ")
+		.replace(/^[. ]+|[. ]+$/g, "")
+		.slice(0, 80);
+	return `${base || "model"}.glb`;
+}
+
+/**
+ * Fit the two heights we have to the one the set should use.
+ *
+ * `measured` is the file's own box, already put through the import heuristic —
+ * which FALLS BACK to exactly 1 m whenever the file is authored in centimetres
+ * or city units, because outside 0.05–10 m the geometry is not trusted at all.
+ * A 1.000 m model is therefore either genuinely one metre tall or a file that
+ * told us nothing, and in both cases a category hint from the search ("chair"
+ * -> 0.9 m) is the better number. An explicit request always wins over both,
+ * and a trusted measurement always wins over a hint.
+ */
+export function resolvePolyObjectHeight({ measured, hint, requested } = {}) {
+	const asked = Number(requested);
+	if (Number.isFinite(asked) && asked > 0) return asked;
+	const measuredHeight = Number(measured);
+	const hinted = Number(hint);
+	const measuredIsFallback = !Number.isFinite(measuredHeight) || Math.abs(measuredHeight - 1) < 1e-6;
+	if (measuredIsFallback && Number.isFinite(hinted) && hinted > 0) return hinted;
+	return Number.isFinite(measuredHeight) && measuredHeight > 0 ? measuredHeight : (Number.isFinite(hinted) && hinted > 0 ? hinted : 1);
+}
+
+/**
+ * Fetch the model file itself. Poly Pizza's CDN sends
+ * `access-control-allow-origin: *`, which is what makes this the one call the
+ * browser can make on its own — and why the key never has to leave the sidecar.
+ *
+ * The ceiling is the studio's own: bytes past `ASSET_MAX_SOURCE_BYTES` could
+ * never be imported anyway, and refusing them here says so before the download
+ * finishes instead of after.
+ */
+export async function downloadPolyModel(model, { fetchImpl = globalThis.fetch, maxBytes, signal } = {}) {
+	if (!model?.downloadUrl) throw new Error("that model has no file to download");
+	if (typeof fetchImpl !== "function") throw new Error("no fetch available");
+	const limit = Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : null;
+	const response = await fetchImpl(model.downloadUrl, { signal });
+	if (!response?.ok) throw new Error(`the model file could not be downloaded (${response?.status ?? "no response"})`);
+	// A declared length over the ceiling is refused before a byte is buffered.
+	const declared = Number(response.headers?.get?.("content-length"));
+	if (limit && Number.isFinite(declared) && declared > limit) throw new Error("that model is larger than this studio can import");
+	const bytes = await response.arrayBuffer();
+	if (limit && bytes.byteLength > limit) throw new Error("that model is larger than this studio can import");
+	if (!bytes.byteLength) throw new Error("that model file is empty");
+	return { bytes, name: polyFileName(model), type: "model/gltf-binary" };
+}
+
+/**
+ * The API path for a search: `/<term>?limit=&page=`.
+ *
+ * The term is one path segment on purpose — a space, a slash or a `..` in it
+ * must address nothing but a search for those characters, never another route
+ * on the upstream host.
+ */
 export function polySearchPath(query, { limit = POLY_SEARCH_DEFAULT_LIMIT, page } = {}) {
 	const clean = text(query, 120);
 	if (!clean) throw new Error("a search needs words");
@@ -249,7 +315,7 @@ export async function searchPolyModels(query, { limit, page, fetchImpl = globalT
 	const path = polySearchPath(query, { limit, page });
 	let response;
 	try {
-		response = await fetchImpl(`/poly${path}`, { signal, headers: { accept: "application/json" } });
+		response = await fetchImpl(`/agent/poly${path}`, { signal, headers: { accept: "application/json" } });
 	} catch (error) {
 		return { source: "none", total: 0, models: [], reason: error?.message || "the library could not be reached" };
 	}

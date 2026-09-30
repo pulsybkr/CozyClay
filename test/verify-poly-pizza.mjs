@@ -9,8 +9,10 @@ import {
 	POLY_SEARCH_MAX_LIMIT,
 	POLY_SEARCH_MAX_PAGE,
 	POLY_TRI_COUNT_WARN,
+	downloadPolyModel,
 	polyAttributionLine,
 	polyCredit,
+	polyFileName,
 	polyHeavyModelReason,
 	polyHeightHint,
 	polyLicenseAllows,
@@ -20,6 +22,7 @@ import {
 	normalizePolyModel,
 	normalizePolySearch,
 	rankPolyModels,
+	resolvePolyObjectHeight,
 	searchPolyModels,
 } from "../src/poly-pizza.js";
 
@@ -243,6 +246,71 @@ check("a pathological triangle count is called out before the download", () => {
 	assert.equal(polyHeavyModelReason(null), null);
 });
 
+/* -------------------------------------------------------- file name ---- */
+
+check("a title becomes a file name the studio and the OS both accept", () => {
+	assert.equal(polyFileName({ title: "Chair" }), "Chair.glb");
+	assert.equal(polyFileName({ title: "Office Chair 2" }), "Office Chair 2.glb");
+	assert.equal(polyFileName({ title: "a/b\\c:d*e?f\"g<h>i|j" }), "a b c d e f g h i j.glb");
+	assert.equal(polyFileName({ title: "   " }), "model.glb");
+	assert.equal(polyFileName(null), "model.glb");
+	assert.equal(polyFileName({ title: ".." }), "model.glb");
+	assert.equal(polyFileName({ title: "x".repeat(300) }).length <= 84, true);
+});
+
+/* ------------------------------------------------------ fitted height ---- */
+
+check("an explicit height wins over everything", () => {
+	assert.equal(resolvePolyObjectHeight({ measured: 2, hint: 0.9, requested: 1.4 }), 1.4);
+	assert.equal(resolvePolyObjectHeight({ requested: 0.05 }), 0.05);
+});
+
+check("a trusted measurement beats a category hint", () => {
+	// A 2.1 m model measured from its own bounds is a door; the hint agrees.
+	assert.equal(resolvePolyObjectHeight({ measured: 2.1, hint: 0.9 }), 2.1);
+});
+
+check("the 1 m import fallback is replaced by the category hint", () => {
+	// Exactly 1.000 m is what fitMeshBounds produces when a file is authored in
+	// centimetres or city units — it is a fallback, not a measurement.
+	assert.equal(resolvePolyObjectHeight({ measured: 1, hint: 0.9 }), 0.9);
+	assert.equal(resolvePolyObjectHeight({ measured: 1, hint: null }), 1);
+	assert.equal(resolvePolyObjectHeight({}), 1);
+});
+
+/* ----------------------------------------------------------- download ---- */
+
+await checkAsync("a downloaded model arrives as bytes with a .glb name", async () => {
+	const seen = [];
+	const fetchImpl = async (url) => {
+		seen.push(url);
+		return { ok: true, status: 200, headers: new Map([["content-length", "4"]]), arrayBuffer: async () => new ArrayBuffer(4) };
+	};
+	const result = await downloadPolyModel(normalizePolyModel(apiChair), { fetchImpl });
+	assert.equal(seen[0], apiChair.Download);
+	assert.equal(result.name, "Chair.glb");
+	assert.equal(result.type, "model/gltf-binary");
+	assert.equal(result.bytes.byteLength, 4);
+});
+
+await checkAsync("a model larger than the studio's ceiling is refused", async () => {
+	const fetchImpl = async () => ({ ok: true, status: 200, headers: new Map([["content-length", "999999"]]), arrayBuffer: async () => new ArrayBuffer(999999) });
+	await assert.rejects(() => downloadPolyModel(normalizePolyModel(apiChair), { fetchImpl, maxBytes: 1024 }), /larger than this studio can import/);
+});
+
+await checkAsync("a file that arrives over the ceiling is refused even when no length was declared", async () => {
+	const fetchImpl = async () => ({ ok: true, status: 200, headers: new Map(), arrayBuffer: async () => new ArrayBuffer(2048) });
+	await assert.rejects(() => downloadPolyModel(normalizePolyModel(apiChair), { fetchImpl, maxBytes: 1024 }), /larger than this studio can import/);
+});
+
+await checkAsync("an empty or failed download says which it was", async () => {
+	const empty = async () => ({ ok: true, status: 200, headers: new Map(), arrayBuffer: async () => new ArrayBuffer(0) });
+	await assert.rejects(() => downloadPolyModel(normalizePolyModel(apiChair), { fetchImpl: empty }), /empty/);
+	const failed = async () => ({ ok: false, status: 403, headers: new Map(), arrayBuffer: async () => new ArrayBuffer(1) });
+	await assert.rejects(() => downloadPolyModel(normalizePolyModel(apiChair), { fetchImpl: failed }), /403/);
+	await assert.rejects(() => downloadPolyModel(null, { fetchImpl: failed }), /no file to download/);
+});
+
 /* --------------------------------------------------------------- search ---- */
 
 const jsonResponse = (body, status = 200) => ({
@@ -258,7 +326,7 @@ await checkAsync("a search reads the sidecar path and returns ranked models", as
 		return jsonResponse({ total: 262, results: [apiChair] });
 	};
 	const result = await searchPolyModels("chair", { fetchImpl });
-	assert.equal(seen[0].startsWith("/poly/search/chair?"), true, seen[0]);
+	assert.equal(seen[0].startsWith("/agent/poly/search/chair?"), true, seen[0]);
 	assert.equal(result.source, "sidecar");
 	assert.equal(result.total, 262);
 	assert.equal(result.models.length, 1);

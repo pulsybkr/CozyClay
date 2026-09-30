@@ -200,6 +200,46 @@ const CUTOUT_ENTRY = {
  * clones of the same file can disagree about looking like a maquette.
  */
 export const MESH_KIND = "mesh";
+
+/**
+ * The provenance an imported model carries, or null.
+ *
+ * A CC-BY model without its credit is a licence breach, and a set is exported
+ * and re-opened long after anyone remembers where a couch came from — so the
+ * credit is part of the record, not a toast that scrolls away. Every field is
+ * repaired here: a half-written credit is worse than none, because it still
+ * reads as authoritative while pointing at the wrong page.
+ */
+export function normalizeObjectCredit(record) {
+	if (!record || typeof record !== "object" || Array.isArray(record)) return null;
+	const pick = (value, max) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : "");
+	const library = pick(record.library, 40);
+	const id = pick(record.id, 64);
+	// Without a library and an id there is nothing to check the claim against.
+	if (!library || !id) return null;
+	const url = (value, max = 2048) => {
+		const raw = pick(value, max);
+		if (!raw) return "";
+		try {
+			const parsed = new URL(raw);
+			return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : "";
+		} catch {
+			return "";
+		}
+	};
+	return {
+		library,
+		id,
+		title: pick(record.title, 120),
+		creator: pick(record.creator, 80),
+		license: pick(record.license, 60) || "Unknown",
+		licenseUrl: url(record.licenseUrl),
+		sourceUrl: url(record.sourceUrl),
+		attribution: pick(record.attribution, 400),
+		downloadedAt: pick(record.downloadedAt, 40),
+	};
+}
+
 const MESH_ENTRY = {
 	kind: MESH_KIND,
 	label: "Model",
@@ -461,7 +501,7 @@ export function duplicateCutoutOptions(object) {
  * stored (not derived): the GLB's width/depth ratio is independent of height,
  * and a later height edit scales that stored rectangle uniformly.
  */
-export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footprint, name = "", clay = false } = {}, existing = [], placement = {}) {
+export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footprint, name = "", clay = false, credit = null } = {}, existing = [], placement = {}) {
 	if (typeof assetId !== "string" || !assetId) return null;
 	const meshHeight = Math.max(MESH_HEIGHT_MIN, Number(height));
 	if (!Number.isFinite(meshHeight)) return null;
@@ -498,6 +538,10 @@ export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footpr
 		hidden: false,
 		assetId,
 		clay: clay === true,
+		// Provenance travels with the bytes' reference: a re-imported model keeps
+		// its own credit, and an unattributed one carries none rather than an
+		// empty shell that a later export would read as "no obligation".
+		...(normalizeObjectCredit(credit) ? { credit: normalizeObjectCredit(credit) } : {}),
 		footprint: meshFootprint,
 		height: meshHeight,
 	};
@@ -507,7 +551,7 @@ export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footpr
  * is minted through the same door an import is, so it must carry the model
  * it renders, the standing size, and whether it is wearing clay. */
 export function duplicateMeshOptions(object) {
-	return { assetId: object.assetId, height: object.height, footprint: object.footprint, name: object.name, clay: object.clay === true };
+	return { assetId: object.assetId, height: object.height, footprint: object.footprint, name: object.name, clay: object.clay === true, credit: object.credit ?? null };
 }
 
 /** Every writable transform channel and the rule that keeps it in the room. */
@@ -627,6 +671,13 @@ export function updateSceneObject(objects, id, patch) {
 		for (const key of ["name", "color"]) {
 			if (typeof patch[key] !== "string" || !patch[key] || patch[key] === object[key]) continue;
 			update[key] = patch[key];
+		}
+		// Provenance is repaired, never trusted: a record whose credit cannot be
+		// read is written as no credit at all, so an export never cites a page
+		// the data does not actually name.
+		if (patch.credit !== undefined) {
+			const next = patch.credit === null ? null : normalizeObjectCredit(patch.credit);
+			if (JSON.stringify(next) !== JSON.stringify(object.credit ?? null)) update.credit = next;
 		}
 		if (typeof patch.hidden === "boolean" && patch.hidden !== (object.hidden === true)) update.hidden = patch.hidden;
 		// The travel path is authored geometry, not a bounded transform: it is
@@ -884,6 +935,9 @@ export function normalizeSceneObject(record) {
 				? {
 						assetId: record.assetId,
 						clay: record.clay === true,
+						// Provenance is optional: a model imported from disk, or from
+						// before this field existed, simply has none.
+						...(normalizeObjectCredit(record.credit) ? { credit: normalizeObjectCredit(record.credit) } : {}),
 						// Stored box is the truth: the 0.05–10 m import heuristic is
 						// NOT re-run here, or a deliberately 12 m truck would shrink
 						// back to 1 m on reload.
