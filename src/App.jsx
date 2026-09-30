@@ -10,6 +10,7 @@ import PosePanel from "./panels/PosePanel.jsx";
 import RigPanel from "./panels/RigPanel.jsx";
 import CharacterTransformPanel from "./panels/CharacterTransformPanel.jsx";
 import SubjectsPanel from "./panels/SubjectsPanel.jsx";
+import VrmGenerationPanel from './panels/VrmGenerationPanel.jsx';
 import { useShots } from "./domains/shots.js";
 import CameraPanel from "./panels/CameraPanel.jsx";
 import { useObjects } from "./domains/objects.js";
@@ -7813,7 +7814,8 @@ export default function App() {
 					<CameraPanel isCameraSelection={isCameraSelection || workflowMode==='camera'} cameras={shotsDomain.state().cameras} frame={tlFrame} shot={shot} moveSequence={moveSequence} cameraKeys={cameraKeys} activeShot={activeShot} changeShotTargetModel={changeShotTargetModel} />
 
 				<FacialExpressionsPanel hidden={!isCharacterSelection} character={activeChar} rig={activeRig} seconds={tlFrame / TIMELINE_FPS} duration={tlFrameCount / TIMELINE_FPS} onAgent={() => setStudioAgentMode(true)} />
-				<SubjectsPanel
+                <VrmGenerationPanel hidden={workflowMode!=='scene'} />
+                <SubjectsPanel
 					isCharacterSelection={isCharacterSelection}
 					showB={showB}
 					characters={characters}

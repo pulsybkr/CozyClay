@@ -1,0 +1,19 @@
+{
+  "checks": [
+    "external job tracking",
+    "agent import of completed job",
+    "two generated VRM rigs loaded",
+    "happy expression capability",
+    "undo",
+    "project embeds avatar bytes",
+    "reopen without API model URL"
+  ],
+  "generationMode": "resume previously generated job",
+  "generationJobId": "job_09dbec9169b54ade",
+  "importJobId": "job_09dbec9169b54ade",
+  "characterIds": [
+    "character-muom1miy-4",
+    "character-muom1pm1-7"
+  ],
+  "assetCount": 1
+}

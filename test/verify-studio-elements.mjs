@@ -5,7 +5,8 @@ import { buildPatchSchema, patchValueSchema, STUDIO_PATCHABLE_PATHS, STUDIO_PATC
 import { createCharacterEntry, createSceneStage } from "../src/scenes.js";
 import { normalizeSceneObject, updateSceneObject } from "../src/scene-objects.js";
 import { createShotAuthoringDocument } from "../src/shot-authoring.js";
-import { STUDIO_ACTION_IDS } from "../src/studio-actions.js";
+import { commandDeclarations } from '../src/commands/index.js';
+const STUDIO_ACTION_IDS=commandDeclarations().map(entry=>entry.id);
 
 const normalizers = {
 	createCharacterEntry,
@@ -93,6 +94,10 @@ const framing = { pos: { x: 2, y: 3, z: 4 }, yaw: 0.25, pitch: -0.2, fovDeg: 42 
 const shotDocument = (shot) => createShotAuthoringDocument({ frameCount: 96, shots: [{ id: "shot-test", startFrame: 0, endFrame: 95, ...shot }] }).shots[0];
 
 function makeCase(entry) {
+  if (entry.path === 'shot.cameraId') {
+    const input={cameraId:'camera-authored'};
+    return {input,output:shotDocument(input),read:output=>output.cameraId};
+  }
 	if (entry.path === "shot.targetModel") {
 		const input = { targetModel: "seedance-2.5" };
 		return { input, output: shotDocument(input), read: (output) => output.targetModel ?? null };
@@ -159,6 +164,7 @@ function makeCase(entry) {
 }
 
 const expected = new Map([
+  ['shot.cameraId','camera-authored'],
 	["character.position", [1.25, 2.5, -3.75]],
 	["character.rot", 15],
 	["character.expressions", [{ expression: "happy", keys: [{ t: 0, weight: 0.5 }] }]],

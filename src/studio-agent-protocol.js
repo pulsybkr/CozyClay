@@ -1,5 +1,6 @@
 // Shared by the browser and sidecar. No Node, React, renderer or provider imports.
 import { STUDIO_ELEMENTS, isSettableElement } from "./studio-elements.js";
+import { CHARACTER_MODEL_IDS, GENERATED_VRM_PATTERN } from './character-models.js';
 
 export const STUDIO_PROTOCOL_VERSION = "studio-agent-v1";
 // Sized for the compact index of up to 400 entities (~100 bytes each) beside
@@ -130,6 +131,7 @@ const PATCH_VALUE_SCHEMAS = {
  * schema above). Null elements are omitted from the patch schema, and
  * test/verify-studio-elements.mjs fails the moment the table declares one. */
 export function patchValueSchema(element) {
+  if (element.path === 'character.model') return {oneOf:[{type:'string',enum:CHARACTER_MODEL_IDS},{type:'string',pattern:GENERATED_VRM_PATTERN,maxLength:41}]};
 	if (Object.hasOwn(PATCH_VALUE_SCHEMAS, element.path)) return PATCH_VALUE_SCHEMAS[element.path];
 	if (element.type === "number") return number(element.min, element.max);
 	if (element.type === "boolean") return bool;

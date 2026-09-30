@@ -45,7 +45,8 @@ export default function SubjectBox({ label, value, onChange, onRemove, onPose, p
 			</div>
 			<label className="subject-model-field">
 				<span>{ko("Character model", "인물 모델")}</span>
-				<select aria-label={ko(`Character model for ${label}`, `${label} 인물 모델`)} value={value.model} onChange={event => onChange({ model: event.target.value })}>
+                <select aria-label={ko(`Character model for ${label}`, `${label} 인물 모델`)} value={value.model} onChange={event => onChange({ model: event.target.value })}>
+                    {!CHARACTER_MODELS.some(model=>model.id===value.model) && <option value={value.model}>{value.subject || 'Generated avatar'} · VRM</option>}
 					{CHARACTER_MODELS.map(model => <option key={model.id} value={model.id}>{model.label}{model.format === "vrm" ? " · VRM" : ""}</option>)}
 				</select>
 			</label>

@@ -11568,3 +11568,12 @@ input[type=range] {
 .scene-camera-key-fields label { display: grid; gap: 3px; font-size: 10px; color: var(--muted); }
 .scene-cameras input { min-width: 0; width: 100%; border: 1px solid var(--line2); border-radius: 4px; padding: 5px; background: var(--card2); color: var(--fg); }
 .scene-camera-error { color: #efb580; }
+.vrm-generator,.vrm-generator label,.vrm-job { display:grid; gap:6px; }
+.vrm-generator { gap:10px; }
+.vrm-generator input,.vrm-generator textarea,.vrm-generator select,.vrm-generator button { width:100%; min-width:0; box-sizing:border-box; padding:6px; border:1px solid var(--line2); border-radius:4px; background:var(--card2); color:var(--fg); font:inherit; }
+.vrm-generator button { cursor:pointer; }
+.vrm-generator button:disabled { opacity:.45; cursor:default; }
+.vrm-job { border-top:1px solid var(--line2); padding-top:8px; }
+.vrm-job progress { width:100%; }
+.vrm-job small { color:var(--muted); overflow-wrap:anywhere; }
+.vrm-generator [role="alert"] { color:#efb580; white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; }

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig,loadEnv } from "vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
@@ -17,6 +17,7 @@ const livePort = process.env.COZYCLAY_LIVE_PORT ?? "5184";
 const oauthPort = process.env.COZYCLAY_OAUTH_PORT?.trim();
 const oauthUrl = oauthPort ? `http://127.0.0.1:${oauthPort}` : null;
 const agentUrl = oauthUrl;
+const vrmApiUrl=process.env.CCLAY_VRM_API_URL?.trim() || loadEnv('development',import.meta.dirname,'CCLAY_').CCLAY_VRM_API_URL?.trim() || 'http://127.0.0.1:8765';
 
 export default defineConfig({
 	define: {
@@ -137,9 +138,10 @@ export default defineConfig({
 		// companion on loopback. The proxy is enabled only when dev-full (or a
 		// user-managed bridge) explicitly provides its endpoint. The production
 		// build stays fully static, so this proxy must never become a requirement.
-		...(motionBridgeUrl || oauthUrl
+        ...(motionBridgeUrl || oauthUrl || vrmApiUrl
 			? {
-				proxy: {
+                proxy: {
+                    '/vrm-api': {target:vrmApiUrl,rewrite:path=>path.replace(/^\/vrm-api/,'')},
 					...(oauthUrl ? { "/oauth": { target: oauthUrl }, "/agent": { target: agentUrl } } : {}),
 					...(motionBridgeUrl
 						? {

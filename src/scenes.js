@@ -9,7 +9,7 @@ import { normalizeStableItems } from "./stable-items.js";
 import { normalizeMotionCalibration } from "./ardy/motion-calibration.js";
 import { elementByPath } from "./studio-elements.js";
 import { wrapAngle } from "./scene-objects.js";
-import { CHARACTER_MODEL_IDS } from "./character-models.js";
+import { isCharacterModel } from "./character-models.js";
 export { CHARACTER_MODEL_IDS } from "./character-models.js";
 
 const CHARACTER_POSITION_LIMITS = elementByPath("character.position");
@@ -159,7 +159,7 @@ export function createCharacterEntry(source = null, index = 0) {
 	const s = plainObject(source) ? source : {};
 	return {
 		id: typeof s.id === "string" && s.id ? s.id : `char-${index + 1}`,
-		model: CHARACTER_MODEL_IDS.includes(s.model) ? s.model : DEFAULT_CHARACTER_MODEL,
+        model: isCharacterModel(s.model) ? s.model : DEFAULT_CHARACTER_MODEL,
 		x: Math.max(CHARACTER_POSITION_LIMITS.min.x, Math.min(CHARACTER_POSITION_LIMITS.max.x, finiteOr(s.x, 0))),
 		// Lift is bounded by the deck and the shared room headroom, so every
 		// writer (inspector field, viewport gizmo, load path) shares one envelope.

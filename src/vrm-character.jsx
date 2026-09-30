@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
 import { loadVrm, disposeVrm, setVrmStandingPose } from "./vrm-runtime.js";
+import { assetRecord } from './scene-asset-cache.js';
 
 export default function VrmCharacter({ url, position, rot, scale = 1, pose, onRig, pickId }) {
 	const [state, setState] = useState({ url, rig: null, error: null });
@@ -9,7 +10,15 @@ export default function VrmCharacter({ url, position, rot, scale = 1, pose, onRi
 	useEffect(() => {
 		let cancelled = false, owned = null;
 		setState({ url, rig: null, error: null });
-		loadVrm(url).then(rig => {
+        const load = async () => {
+          if (!url.startsWith('asset:')) return loadVrm(url);
+          const asset = await assetRecord(url.slice(6));
+          if (!asset) throw new Error('Avatar bytes are missing. Reopen the saved project or import the completed VRM job.');
+          const objectUrl = URL.createObjectURL(new Blob([asset.bytes],{type:'model/gltf-binary'}));
+          try { return await loadVrm(objectUrl); }
+          finally { URL.revokeObjectURL(objectUrl); }
+        };
+        load().then(rig => {
 			if (cancelled) { disposeVrm(rig); return; }
 			owned = rig;
 			setVrmStandingPose(rig);

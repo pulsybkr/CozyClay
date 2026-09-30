@@ -18,6 +18,7 @@
  * Everything above the storage adapter is pure and testable in node; the
  * adapter is the only part that needs a browser.
  */
+import { generatedVrmAssetId } from './character-models.js';
 
 /** Content-addressed, so the same bytes always land on the same id. */
 export const ASSET_ID_PREFIX = "img-";
@@ -319,6 +320,10 @@ export function referencedAssetIds(scenes) {
 export function assetUsageCounts(scenes) {
 	const counts = new Map();
 	for (const scene of Array.isArray(scenes) ? scenes : []) {
+		for (const character of Array.isArray(scene?.stage?.characters) ? scene.stage.characters : []) {
+			const id = generatedVrmAssetId(character?.model);
+			if (id) counts.set(id,(counts.get(id) ?? 0)+1);
+		}
 		for (const object of Array.isArray(scene?.objects) ? scene.objects : []) {
 			const objectAssetIds = new Set();
 			// A matted cutout needs all three stored images to remain editable:
@@ -346,6 +351,7 @@ export function assetGraphSignature(scenes) {
 				typeof object?.id === "string" ? object.id : null,
 				...[object?.assetId, object?.sourceAssetId, object?.matteAssetId].map((id) => (isAssetId(id) ? id : null)),
 			]),
+			(Array.isArray(scene?.stage?.characters) ? scene.stage.characters : []).map(character => [character?.id,generatedVrmAssetId(character?.model)]),
 		]),
 	);
 }
