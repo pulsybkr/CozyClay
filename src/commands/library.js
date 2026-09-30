@@ -30,7 +30,7 @@ const input = (required, optional = {}) => ({ type: "object", properties: { ...r
 export const declarations = Object.freeze([
 	{ ...studioActionDeclaration("asset.searchLibrary"), kind: "job", domain: "library",
 		input: input({ query: { type: "string", minLength: 1, maxLength: 120 } }, { limit: { type: "integer", minimum: 1, maximum: 20 } }) },
-	{ ...studioActionDeclaration("asset.downloadLibraryModel"), kind: "job", domain: "library",
+	{ ...studioActionDeclaration("asset.downloadLibraryModel"), kind: "job", domain: "objects",
 		input: input(
 			{ id: { type: "string", minLength: 1, maxLength: 64 }, title: { type: "string", minLength: 1, maxLength: 120 }, license: { type: "string", minLength: 1, maxLength: 60 } },
 			{
