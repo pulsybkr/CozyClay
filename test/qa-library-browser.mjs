@@ -66,7 +66,6 @@ const shoot = async (name) => {
 };
 
 const QUERY = process.env.QA_LIBRARY_QUERY ?? "office chair";
-
 /** The scene objects of the OPEN scene, read through the project's own export.
  * `scenes` is an object keyed by scene id in the document, so the open scene is
  * picked by the workspace's active id rather than by array position. */
@@ -115,11 +114,18 @@ const focused = await evaluate(`(() => {
 	return document.activeElement === input;
 })()`);
 expect("the search box can take focus", focused === true);
-// `Input.insertText` is atomic: dispatching characters one by one through
-// `dispatchKeyEvent` drops them under a busy renderer, and a driver that types
-// "chai" for "chair" then blames the pane for searching the wrong word.
+// `Input.insertText` is atomic; a focus that has not settled under a busy
+// renderer drops it entirely, which reads as "the box lost what was typed".
 await send("Input.insertText", { text: QUERY });
-const typed = await evaluate(`document.querySelector('.library-pane .library-search-input').value`);
+let typed = await evaluate(`document.querySelector('.library-pane .library-search-input').value`);
+if (typed !== QUERY) {
+	// One retry after a beat: the field is a React controlled input, and the
+	// first insert can land before the listener is attached.
+	await new Promise((resolve) => setTimeout(resolve, 500));
+	await evaluate(`document.querySelector('.library-pane .library-search-input').focus()`);
+	await send("Input.insertText", { text: QUERY });
+	typed = await evaluate(`document.querySelector('.library-pane .library-search-input').value`);
+}
 expect("the search box shows what was typed", typed === QUERY, `got ${JSON.stringify(typed)}`);
 
 const settled = await waitFor("document.querySelector('.library-status') && !/Searching/.test(document.querySelector('.library-status').textContent)", 30_000);
