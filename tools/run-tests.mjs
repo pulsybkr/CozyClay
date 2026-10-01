@@ -19,6 +19,7 @@ const NODE_FILES = [
   "test/verify-poly-pizza-route.mjs",
   "test/verify-library-commands.mjs",
   "test/verify-library-pane.mjs",
+  "test/verify-attach-bone.mjs",
   "test/verify-motion-per-character.mjs",
   "test/process/verify-poly-launcher.mjs",
   "test/verify-pace.mjs",
