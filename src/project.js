@@ -15,9 +15,10 @@
  */
 
 import { SCENES_VERSION } from "./scenes.js";
+import { referencedProductionAssetIds } from "./production/resources.js";
 import { ASSET_MAX_SOURCE_BYTES, assetIdForBytes, isAssetId, isImageAssetId, isMeshAssetId, meshIdForBytes, normalizeAsset, referencedAssetIds } from "./scene-assets.js";
 
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 5;
 export const PROJECT_EXTENSION = ".cclayproject";
 export const WORKFLOW_VERSION = 1;
 export const WORKFLOW_STORAGE_KEY = "cozyclay.workflow.v1";
@@ -368,7 +369,7 @@ function readEmbeddedMotions(value, report) {
  * the project uses. Throws `resources-too-large` when one motion or the whole
  * manifest exceeds its budget.
  */
-export function createProjectDocument({ scenesDocument, workspaceLayout, customPoses, name, assets, motions, savedAt, workflow }) {
+export function createProjectDocument({ scenesDocument, workspaceLayout, customPoses, name, assets, motions, savedAt, workflow, production }) {
 	const assetRecords = new Map();
 	for (const record of Array.isArray(assets) ? assets : []) {
 		const asset = embeddedAsset(record);
@@ -378,6 +379,7 @@ export function createProjectDocument({ scenesDocument, workspaceLayout, customP
 	let resourceBytes = 0;
 	const referencedIds = referencedAssetIds(scenesDocument?.scenes);
 	for (const id of workflowAssetIds(workflow)) referencedIds.add(id);
+	for (const id of referencedProductionAssetIds(production)) referencedIds.add(id);
 	for (const id of referencedIds) {
 		const asset = assetRecords.get(id);
 		if (!asset) continue;
@@ -410,6 +412,7 @@ export function createProjectDocument({ scenesDocument, workspaceLayout, customP
 		poseLibrary: Array.isArray(customPoses) ? customPoses : [],
 		workflow: normalizeWorkflowGraph(workflow),
 		resources: { assets: embeddedAssets, motions: embeddedMotions },
+		production: production ?? null,
 	};
 }
 
@@ -446,6 +449,7 @@ export function readProjectDocument(raw) {
 	const assets = readEmbeddedAssets(assetRecords, report);
 	const motions = parsed.version >= 4 ? readEmbeddedMotions(parsed.resources?.motions, report) : [];
 	const workflow = normalizeWorkflowGraph(parsed.workflow);
+	const production = parsed.version >= 5 && parsed.production && typeof parsed.production === "object" ? parsed.production : null;
 	return {
 		ok: true,
 		warnings,
@@ -461,6 +465,7 @@ export function readProjectDocument(raw) {
 			assets,
 			motions,
 			workflow,
+			production,
 		},
 	};
 }

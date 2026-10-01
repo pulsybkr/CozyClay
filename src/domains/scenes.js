@@ -222,6 +222,7 @@ export function useScenes(appContext) {
 			customPoses: appContext.shared.projectStateRef.current.customPoses,
 			workflow: loadWorkflowGraph(),
 			name,
+			production: appContext.storeDomain('production')?.exportPortable?.() ?? null,
 		};
 	}
 
@@ -417,6 +418,7 @@ export function useScenes(appContext) {
 		appContext.bus.run('cast.setCustomPoses', { poses: mergedCustomPoses });
 		const resolvedWorkflow = resolveWorkflowOutputs(normalizeWorkflowGraph(project.workflow), new Map((project.assets ?? []).map((asset) => [asset.id, asset])));
 		storeWorkflowGraph(resolvedWorkflow);
+		appContext.storeDomain('production')?.loadPortable?.(project.production ?? null);
 		saveCustomPoses(mergedCustomPoses);
 		persistScenes(doc.scenes, doc.activeSceneId);
 		openScene(doc.scenes[activeSceneIndex(doc.scenes, doc.activeSceneId)], doc.scenes);
