@@ -5,7 +5,7 @@ import { generationArgs } from '../../src/motion/generation.js';
 const STUDIO_TOOL_RECEIPT_NOTE = " The result may be a receipt with status \"partial\": ops[].droppedPaths names exactly which authored path each op refused, and delta[].after carries the value actually landed for that target -- quote both the requested and the landed value when you report this, never say only that some paths were not applied. A STALE_SCENE error means inspect_studio once for the fresh revision, then resubmit the identical operation with that revision; it is not a permanent failure.";
 const STUDIO_INSPECT_NOTE = ' The per-turn context contains entityIndex and actionIndex. Read authored state and its set schemas with scope "document", optionally selecting kinds or ids. Legacy scene/shot/motion/selection scopes are document projections too; runtime facts remain in context. Scope "entities" pages entity detail by ids or query. Pass nextCursor as cursor for the next page; on STALE_CURSOR restart without it. Scope "catalogue" lists placeable kinds and patchable paths.';
 const STUDIO_MUTATION_TOOLS = new Set(["operate_studio", "arrange_objects", "arrange_characters", "patch_elements", "frame_shot", "verify_result", "undo_edit", "run_action"]);
-const schema = name => ({ type: "function", name, description: `Studio ${name.replaceAll("_", " ")} command.${name === "generate_motion" ? " Timing: give EITHER source.durationSeconds (total) with NO per-beat seconds, OR seconds on EVERY beat with NO durationSeconds. Generation is an alias for motion.generate in the editor, including the character's root path, pose controls and take preservation. A completed receipt is undoable with undo_edit; a started receipt carries jobId for run_action job.await or job.cancel. Generation does not certify motion quality: use verify_result for motion checks and report its evidence and any warnings. One generation per user message: a second call fails with GENERATION_LIMIT." : ""}${name === "verify_result" ? " Pass exactly one of receiptId or targets (not both). An earlier receipt stays verifiable after later edits: it answers stale: true with evidenceRevision (the revision that receipt describes) beside revision (the current one), and a requested frame is captured from the current scene; report the evidence as stale, never as current." : ""}${name === "inspect_studio" ? `${STUDIO_INSPECT_NOTE} scope "actions" lists the editor actions for run_action with their availability (the reason when unavailable); with ids it answers those actions' descriptions and input schemas.` : ""}${name === "run_action" ? " Run one editor action by id (actionIndex in the context lists them) with args matching its input schema; read the schema first with inspect_studio scope \"actions\" and ids instead of guessing. A mutating action answers with a receipt (action, summary, delta) that undo_edit reverts; a job action answers status \"started\", or \"completed\" with its output when it runs to its end; only an action declared generation \"motion\" counts as this message's one generation. A document action (scenes, the project file) answers status \"completed\" and is not undoable; when it opens another scene, its host names that scene and later commands are admitted there." : ""}${STUDIO_MUTATION_TOOLS.has(name) ? STUDIO_TOOL_RECEIPT_NOTE : ""}`, parameters: STUDIO_TOOL_SCHEMAS[name] });
+const schema = name => ({ type: "function", name, description: `Studio ${name.replaceAll("_", " ")} command.${name === "generate_motion" ? " Timing: give EITHER source.durationSeconds (total) with NO per-beat seconds, OR seconds on EVERY beat with NO durationSeconds. Generation is an alias for motion.generate in the editor, including the character's root path, pose controls and take preservation. A completed receipt is undoable with undo_edit; a started receipt carries jobId for run_action job.await or job.cancel. Generation does not certify motion quality: use verify_result for motion checks and report its evidence and any warnings. One generation per CHARACTER per user message: generating for a different character in the same message is allowed, but generating twice for one character fails with GENERATION_LIMIT, so report the first result and ask the user before regenerating that performer." : ""}${name === "verify_result" ? " Pass exactly one of receiptId or targets (not both). An earlier receipt stays verifiable after later edits: it answers stale: true with evidenceRevision (the revision that receipt describes) beside revision (the current one), and a requested frame is captured from the current scene; report the evidence as stale, never as current." : ""}${name === "inspect_studio" ? `${STUDIO_INSPECT_NOTE} scope "actions" lists the editor actions for run_action with their availability (the reason when unavailable); with ids it answers those actions' descriptions and input schemas.` : ""}${name === "run_action" ? " Run one editor action by id (actionIndex in the context lists them) with args matching its input schema; read the schema first with inspect_studio scope \"actions\" and ids instead of guessing. A mutating action answers with a receipt (action, summary, delta) that undo_edit reverts; a job action answers status \"started\", or \"completed\" with its output when it runs to its end; only an action declared generation \"motion\" counts as this message's one generation. A document action (scenes, the project file) answers status \"completed\" and is not undoable; when it opens another scene, its host names that scene and later commands are admitted there." : ""}${STUDIO_MUTATION_TOOLS.has(name) ? STUDIO_TOOL_RECEIPT_NOTE : ""}`, parameters: STUDIO_TOOL_SCHEMAS[name] });
 export const studioToolSchemas = () => STUDIO_TOOLS.map(schema);
 const text = value => typeof value === "string" ? value : JSON.stringify(value);
 
@@ -18,16 +18,39 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
   // other jobs neither take nor meet that gate), and `timeoutMs` is the hub
   // deadline it runs under, which the hub bounds by MAX_COMMAND_TIMEOUT_MS.
   const declared = new Map((session?.actionIndex ?? []).map(row => [row.id, row]));
-  // One motion generation per user message, shared with generate_motion when
-  // the route passes the turn's gate; a bare tools instance keeps its own.
+  // The generation gate is per CHARACTER, not per message.
+  //
+  // "One motion generation per message" was written when a generation always
+  // meant the active character. A scene with two speakers needs two takes, and
+  // the second is not a retry of the first — it is the other half of the shot
+  // list. The limit that actually protects anything is one take per CHARACTER
+  // per message, which is exactly what a retry loop would violate.
+  //
+  // `used` and `failures` keep their message-level meaning: the route and the
+  // panel read them. `characters` is the ledger that decides admission.
   const generationGate = session?.generation ?? { used: false, failures: 0 };
+  const generationCharacters = generationGate.characters ??= new Map();
+  // Which character a generation targets. An action that picks the active
+  // character itself (motion.generateAllBlocks, motion.generateFromVideo)
+  // names no target, and without a name nothing can prove the next request is
+  // about a different performer — so those keep the message-level rule.
+  const motionTarget = (name, args) => {
+    const inner = name === "run_action" ? args?.args : args;
+    return typeof inner?.characterId === "string" && inner.characterId ? inner.characterId : null;
+  };
   const invoke = async (name, args) => {
     const command = validateStudioCommand({ name, args });
     if (name === 'generate_motion' && command.args.source.kind === 'generate') return invoke('run_action', { action: 'motion.generate', args: generationArgs(command.args) });
     const action = name === "run_action" ? declared.get(command.args.action) : undefined;
     const generation = action?.generation === "motion";
     const vrmGeneration = name === 'run_action' && ['character.generateVrm','character.importVrmJob'].includes(command.args.action);
-    if (generation && (generationGate.used || generationGate.pending)) throw new StudioProtocolError("GENERATION_LIMIT", "One motion generation per user message. Report this result and ask the user before generating again.");
+    if (generation) {
+      const target = motionTarget(name, command.args);
+      // A named character is judged on its own entry; an unnamed action is
+      // judged on the message, because it could be any performer.
+      const taken = target ? generationCharacters.has(target) : generationGate.used;
+      if (taken || generationGate.pending) throw new StudioProtocolError("GENERATION_LIMIT", "One motion generation per user message. Report this result and ask the user before generating again. A different character may still be generated in this message: pass its characterId to generate_motion.");
+    }
     if (generation && (generationGate.failures ?? 0) >= 2) throw new StudioProtocolError("GENERATION_LIMIT", "Two motion generation attempts already failed in this user message. Report both failures to the user and ask before generating again.");
     const payload = mutationNames.has(name) && session?.admission
       ? { name, args: command.args, commandId: session.admission.commandId(), host: session.admission.host, expectedRevision: session.admission.revision,
@@ -70,7 +93,15 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
       if (code === 'CANCELLED' && session?.onJob) return result;
       throw Object.assign(new Error(message), { code, receipt: result });
     }
-    if (generation) generationGate.used = true;
+    if (generation) {
+      generationGate.used = true;
+      // The target is named by the call when it can be. When it is not (an
+      // action that acts on the active character), the receipt usually names
+      // the character it touched — recording it keeps the ledger honest, so a
+      // later regeneration of that same performer is still refused.
+      const touched = motionTarget(name, command.args) ?? (Array.isArray(result?.affectedIds) ? result.affectedIds.find(id => typeof id === "string" && id) : null);
+      if (touched) generationCharacters.set(touched, true);
+    }
     // A scene action that opened another scene answers the new host; later
     // commands in this turn are admitted there, never in another workspace.
     if (name === "run_action" && result?.host && session?.admission && result.host.workspaceId === session.admission.host.workspaceId) {
