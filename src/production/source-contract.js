@@ -278,7 +278,7 @@ export function validateSnapshot(snapshot) {
 			else characterIds.add(char.id);
 
 			if (!isNonEmptyString(char.name)) pushError(errors, `${p}/name`, "MISSING_FIELD", "Character name is required");
-			if (char.heightMeters !== undefined && (!isFiniteNumber(char.heightMeters) || char.heightMeters <= 0.2 || char.heightMeters > 3.0)) {
+			if (char.heightMeters != null && (!isFiniteNumber(char.heightMeters) || char.heightMeters <= 0.2 || char.heightMeters > 3.0)) {
 				pushError(errors, `${p}/heightMeters`, "OUT_OF_BOUNDS", "heightMeters must be between 0.2m and 3.0m");
 			}
 		});
@@ -306,7 +306,7 @@ export function validateSnapshot(snapshot) {
 					else if (propsInSet.has(prop.id)) pushError(errors, `${pp}/id`, "DUPLICATE_ID", `Duplicate prop ID in set: ${prop.id}`);
 					else propsInSet.add(prop.id);
 
-					if (prop.heightMeters !== undefined && (!isFiniteNumber(prop.heightMeters) || prop.heightMeters <= 0)) {
+					if (prop.heightMeters != null && (!isFiniteNumber(prop.heightMeters) || prop.heightMeters <= 0)) {
 						pushError(errors, `${pp}/heightMeters`, "OUT_OF_BOUNDS", "prop heightMeters must be positive");
 					}
 				});
