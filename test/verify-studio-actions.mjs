@@ -27,8 +27,11 @@ const assetActions = ["asset.import"];
 // The 3D library: a search authors nothing (a read the agent may repeat), and a
 // download is a job that makes the same authored edit asset.import makes.
 const libraryActions = ["asset.searchLibrary", "asset.downloadLibraryModel"];
+// Pace: a measurement authors nothing, and a tightening rewrites the take's own
+// source segments — the same mechanism motion.setSegmentSpeed drives.
+const pacingActions = ["motion.readPace", "motion.tightenPace"];
 const aiActions = ["ai.prepareShot", "motion.generateFromVideo"];
-assert.deepEqual([...STUDIO_ACTION_IDS].sort(), [...firstBatch, ...waypointActions, ...ikKeyActions, ...attachActions, ...railActions, ...viewActions, ...exportActions, ...sceneActions, ...projectActions, ...assetActions, ...libraryActions, ...aiActions].sort());
+assert.deepEqual([...STUDIO_ACTION_IDS].sort(), [...firstBatch, ...waypointActions, ...ikKeyActions, ...attachActions, ...railActions, ...viewActions, ...exportActions, ...sceneActions, ...projectActions, ...assetActions, ...libraryActions, ...pacingActions, ...aiActions].sort());
 assert.deepEqual([...STUDIO_ACTION_KINDS], ["mutation", "transient", "job", "document"]);
 assert.ok(Object.isFrozen(STUDIO_ACTIONS));
 for (const action of STUDIO_ACTIONS) {

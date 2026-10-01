@@ -23,6 +23,7 @@ const NODE_FILES = [
   "test/verify-motion-per-character.mjs",
   "test/process/verify-poly-launcher.mjs",
   "test/verify-pace.mjs",
+  "test/verify-pacing-commands.mjs",
   "test/verify-vrm-generation.mjs",
 	"test/verify-scene-cameras.mjs",
 	"test/bus/verify-scene-camera-commands.mjs",
