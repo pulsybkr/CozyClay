@@ -6,6 +6,8 @@ import { createServer } from "node:http";
 import { handleOAuthRequest } from "../bin/codex-auth.mjs";
 import { createAgentHandler } from "../bin/agent/agent-routes.mjs";
 import { createPolyPizzaRoute } from "../bin/agent/poly-pizza-route.mjs";
+import { createSourceRoute } from "../bin/agent/source-routes.mjs";
+import * as providerKeys from "../bin/agent/provider-keys.mjs";
 import { fileURLToPath } from "node:url";
 import {
 	installSignalCleanup,
@@ -102,12 +104,17 @@ const agentHandler = createAgentHandler({ port: mainPort, getBridgeOrigin });
 // process, where the key lives. Its models come from a CDN that does send
 // them, and the editor downloads those directly.
 const polyHandler = createPolyPizzaRoute({ env: process.env });
+const sourceHandler = createSourceRoute({ env: process.env, keys: providerKeys, port: mainPort });
 const oauthServer = createServer((req, res) => {
 	const path = (req.url || "").split("?")[0];
 	const hosts = new Set([`127.0.0.1:${mainPort}`, `localhost:${mainPort}`]);
 	const origins = new Set([`http://127.0.0.1:${mainPort}`, `http://${"local" + "host"}:${mainPort}`]);
 	if (!(origins.has(req.headers.origin) || (req.headers.origin === undefined && req.method === "GET" && hosts.has(req.headers.host)))) { res.writeHead(403, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "forbidden origin" })); return; }
 	if (path.startsWith("/agent/")) {
+		if (path.startsWith("/agent/source/")) {
+			void sourceHandler(req, res, path).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "source sidecar unavailable" })); } });
+			return;
+		}
 		if (path.startsWith("/agent/poly/")) {
 			void polyHandler(req, res, path).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "asset library unavailable" })); } });
 			return;

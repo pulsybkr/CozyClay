@@ -32,6 +32,8 @@ import { checkForUpdate, runUpdate } from "./update-check.mjs";
 import { handleOAuthRequest } from "./codex-auth.mjs";
 import { createAgentHandler } from "./agent/agent-routes.mjs";
 import { createPolyPizzaRoute } from "./agent/poly-pizza-route.mjs";
+import { createSourceRoute } from "./agent/source-routes.mjs";
+import * as providerKeys from "./agent/provider-keys.mjs";
 import { verifyPackageMarker } from "./package-signature.mjs";
 import {
 	markTelemetryNoticeShown,
@@ -435,6 +437,7 @@ const agentHandler = createAgentHandler({ port: () => opts.port, getBridgeOrigin
 // the key lives. Without this mount the library works in development and
 // silently 404s in the packaged build a user actually runs.
 const polyHandler = createPolyPizzaRoute({ env: process.env });
+const sourceHandler = createSourceRoute({ env: process.env, keys: providerKeys, port: () => opts.port });
 server = createServer((req, res) => {
 	const url = new URL(req.url ?? "/", "http://127.0.0.1");
 	if (/^\/oauth\/(start|status|logout)$/.test(url.pathname)) {
@@ -446,6 +449,10 @@ server = createServer((req, res) => {
 		return;
 	}
 	if (url.pathname.startsWith("/agent/")) {
+		if (url.pathname.startsWith("/agent/source/")) {
+			void sourceHandler(req, res, url.pathname).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "source sidecar unavailable" })); } });
+			return;
+		}
 		if (url.pathname.startsWith("/agent/poly/")) {
 			void polyHandler(req, res, url.pathname).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "asset library unavailable" })); } });
 			return;
