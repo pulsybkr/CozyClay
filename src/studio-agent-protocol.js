@@ -31,6 +31,10 @@ export const STUDIO_ERROR_CODES = Object.freeze([
 	"UNKNOWN_TOOL", "UNKNOWN_VARIANT", "DUPLICATE_NAME", "CONTEXT_LIMIT", "CONTEXT_TOO_LARGE", "AMBIGUOUS_TARGET", "AMBIGUOUS_BASIS", "TARGET_NOT_READY", "TARGET_BUSY",
 	"STALE_TARGET", "STALE_SCENE", "STALE_ENVIRONMENT", "STALE_CURSOR", "CAPABILITY_MISSING", "LIVE_HUB_UNAVAILABLE", "AUTH_REQUIRED", "GENERATION_LIMIT", "RATE_LIMITED", "BACKEND_UNAVAILABLE",
 	"VERIFICATION_FAILED", "REPAIR_REGRESSED", "CANCELLED", "UNCERTAIN_APPLY", "UNDO_CONFLICT", "CONFIRMATION_REQUIRED", "TIMEOUT", "UNDO_EXPIRED",
+	"SOURCE_AUTH_REQUIRED", "SOURCE_VERSION_UNSUPPORTED", "SOURCE_REVISION_EXPIRED", "SOURCE_HASH_MISMATCH",
+	"PLAN_NEEDS_DECISION", "PLAN_REVISION_CONFLICT", "UNIT_INPUT_CHANGED", "GRANT_REQUIRED",
+	"BUDGET_EXHAUSTED", "PROVIDER_STATE_UNCERTAIN", "ARTIFACT_MISSING", "NATIVE_CONFLICT",
+	"UNSUPPORTED_INTERACTION", "EXPORT_NOT_VERIFIED", "EXECUTION_FAILED",
 ]);
 export const STUDIO_VARIANTS = freezeStudioData({
 	selectionKinds: ["scene", "object", "character", "rig", "camera"], modes: ["scene", "camera", "motion"], shotModes: ["keys", "follow", "rail"],
@@ -332,13 +336,15 @@ export function validateStudioSchema(schema, value, code = "INVALID_ARGUMENT", p
 	if (schema.type === "null") { if (value !== null) fail(code, "Expected null.", path); return null; }
 	if (schema.type === "object") {
 		if (!record(value)) fail(code, "Expected object.", path);
-		const open = schema.additionalProperties === true;
-		for (const key of Object.keys(value)) if (!Object.hasOwn(schema.properties, key) && !open) fail(code, "Unexpected field.", path);
+		const props = schema.properties || {};
+		const req = schema.required || [];
+		const open = schema.additionalProperties === true || !schema.properties;
+		for (const key of Object.keys(value)) if (!Object.hasOwn(props, key) && !open) fail(code, "Unexpected field.", path);
 		const result = {};
-		if (open) for (const key of Object.keys(value)) if (!Object.hasOwn(schema.properties, key)) result[key] = structuredClone(value[key]);
-		for (const [key, child] of Object.entries(schema.properties)) {
+		if (open) for (const key of Object.keys(value)) if (!Object.hasOwn(props, key)) result[key] = structuredClone(value[key]);
+		for (const [key, child] of Object.entries(props)) {
 			if (Object.hasOwn(value, key)) result[key] = validateStudioSchema(child, value[key], code, `${path}.${key}`);
-			else if (schema.required.includes(key)) fail(code, "Required field missing.", `${path}.${key}`);
+			else if (req.includes(key)) fail(code, "Required field missing.", `${path}.${key}`);
 			else if (Object.hasOwn(child, "default")) result[key] = structuredClone(child.default);
 		}
 		if (schema["x-studio-range"] && result.endFrameExclusive <= result.startFrame) fail(code, "Frame range must be nonempty and half-open.", path);
