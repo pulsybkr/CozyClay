@@ -290,7 +290,7 @@ function registerTests() {
 		assert.deepEqual(result.entities.slice(0,2).map(e=>e.id), ["object-061","char-alex"], "selected, then active, lead the detail");
 		assert.deepEqual(result.entityIndex.map(e=>e.id), c.entities.map(e=>e.id).sort(), "every entity is indexed in stable id order");
 		assert.deepEqual(result.entityIndex.find(e=>e.id==="object-007"), { id: "object-007", kind: "object", name: "Prop 7", position: { x: 7.12, y: 0, z: -2 } });
-		assert.deepEqual(result.entityIndex.find(e=>e.id==="char-alex"), { id: "char-alex", kind: "character", name: "Alex", position: { x: 0, y: 0, z: 0 } });
+		assert.deepEqual(result.entityIndex.find(e=>e.id==="char-alex"), { id: "char-alex", kind: "character", name: "Alex", position: { x: 0, y: 0, z: 0 }, hasMotion: false });
 		protocol.validateStudioContext(result);
 		const duplicate = structuredClone(result); duplicate.entityIndex.push(duplicate.entityIndex[0]); rejects(()=>protocol.validateStudioContext(duplicate), "INVALID_CONTEXT");
 		const missing = structuredClone(result); missing.entityIndex = missing.entityIndex.filter(e=>e.id!=="object-061"); rejects(()=>protocol.validateStudioContext(missing), "INVALID_CONTEXT");

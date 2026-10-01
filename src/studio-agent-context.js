@@ -78,7 +78,10 @@ export function buildStudioContext({ actions, ...input }) {
 	const detailed = new Set(raw.entities.map(e => e.id));
 	const cm = value => { const rounded = Math.round(value * 100) / 100; return rounded === 0 ? 0 : rounded; };
 	const indexRow = e => ({ id: e.id, kind: e.kind, ...(e.name ? { name: [...e.name].slice(0, 60).join("") } : {}),
-		...(e.position ? { position: { x: cm(e.position.x), y: cm(e.position.y), z: cm(e.position.z) } } : {}) });
+		...(e.position ? { position: { x: cm(e.position.x), y: cm(e.position.y), z: cm(e.position.z) } } : {}),
+		// Only a character can carry a take; an object or a rig row must not
+		// claim `false` as if it had been measured.
+		...(e.kind === "character" ? { hasMotion: (e.motion?.takeId ?? null) !== null || (e.motion?.frames ?? 0) > 0 } : {}) });
 	raw.entityIndex = [...raw.entities, ...everyEntity.filter(e => !detailed.has(e.id)).sort(compareIds)]
 		.slice(0, STUDIO_CONTEXT_LIMITS.entityIndex).sort(compareIds).map(indexRow);
 	raw.shots.sort((a, b) => Number(b.id === raw.shot?.id) - Number(a.id === raw.shot?.id) || compareIds(a, b));

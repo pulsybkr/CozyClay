@@ -164,7 +164,13 @@ export function register(registry, ports) {
 		} });
 	registry.register({ ...clear, available: () => Boolean(ports.storeDomain?.('motion')) || typeof ports.clearMotionNative === 'function' || 'The motion owner is not mounted.',
 		run({ characterId }) {
-			if (ports.storeDomain?.('motion')) { characterOf(ports, characterId); owner().clear(characterId); }
+			characterOf(ports, characterId);
+			// The native path clears whatever the editor is SHOWING, so it can only
+			// clear the character the editor is showing. The mounted domain owns the
+			// whole cast's layers and clears the one named, whichever is selected —
+			// in a scene with several performers, "clear Marie's take" must not
+			// require selecting Marie first.
+			if (ports.storeDomain?.('motion')) owner().clear(characterId);
 			else {
 				if (ports.state().activeCharacterId !== characterId) fail('TARGET_NOT_READY', 'Select this character before clearing its take.');
 				ports.clearMotionNative();

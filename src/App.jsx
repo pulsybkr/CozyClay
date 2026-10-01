@@ -8155,6 +8155,15 @@ export default function App() {
 						onUndoDelete={undoDeletedAsset}
 						deletingAssetId={deletingAssetId}
 						resourceManifest={projectManifest}
+						onLibraryPlaced={(receipt, card) => {
+							// A downloaded model is an ordinary object: select it so the
+							// gizmo is ready, and say what arrived — the same courtesy a
+							// dropped file gets.
+							if (receipt?.ok === false) { setToast(receipt.message); return; }
+							const objectId = receipt?.affectedIds?.[0];
+							if (objectId) setSelectedHierarchyId(`object:${objectId}`);
+							setToast(`${card?.title ?? "Model"} placed — type its real height in metres to set the scale`);
+						}}
 					/>
 				</div>
 				<div className="bottom-timeline" hidden={bottomTab !== "timeline"}>

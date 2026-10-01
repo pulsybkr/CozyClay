@@ -214,7 +214,10 @@ const entity = object({ id, kind: choices(["object", "character", "rig"]), token
 });
 // One compact row per entity, so the model sees the whole scene even when
 // only 24 rows carry full detail.
-const indexRow = object({ id, kind: choices(["object", "character", "rig"]) }, { name, position: vec3 });
+// `hasMotion` is on the COMPACT row on purpose: it is the one fact that decides
+// whether a character still needs a generation, and answering it from the
+// entity index saves the agent a detail read per performer.
+const indexRow = object({ id, kind: choices(["object", "character", "rig"]) }, { name, position: vec3, hasMotion: bool });
 // One compact row per registered Studio command: what run_action can call.
 // Its schema is on request (inspect_studio scope "actions" with ids); the
 // declared generation and hub timeout ride along for the sidecar's gate.
