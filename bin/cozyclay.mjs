@@ -31,6 +31,7 @@ import { openBrowser } from "./open-browser.mjs";
 import { checkForUpdate, runUpdate } from "./update-check.mjs";
 import { handleOAuthRequest } from "./codex-auth.mjs";
 import { createAgentHandler } from "./agent/agent-routes.mjs";
+import { createPolyPizzaRoute } from "./agent/poly-pizza-route.mjs";
 import { verifyPackageMarker } from "./package-signature.mjs";
 import {
 	markTelemetryNoticeShown,
@@ -429,6 +430,11 @@ if (opts.motion && kimodoConfigured && existsSync(BRIDGE)) {
 const getBridgeOrigin = () => bridge && bridgePort !== null && bridge.exitCode === null && bridge.signalCode === null
 	? `http://127.0.0.1:${bridgePort}` : null;
 const agentHandler = createAgentHandler({ port: () => opts.port, getBridgeOrigin });
+// The 3D asset library, mounted here as well as in the dev server: its API
+// sends no CORS headers, so a search can only be made from the sidecar, where
+// the key lives. Without this mount the library works in development and
+// silently 404s in the packaged build a user actually runs.
+const polyHandler = createPolyPizzaRoute({ env: process.env });
 server = createServer((req, res) => {
 	const url = new URL(req.url ?? "/", "http://127.0.0.1");
 	if (/^\/oauth\/(start|status|logout)$/.test(url.pathname)) {
@@ -440,6 +446,10 @@ server = createServer((req, res) => {
 		return;
 	}
 	if (url.pathname.startsWith("/agent/")) {
+		if (url.pathname.startsWith("/agent/poly/")) {
+			void polyHandler(req, res, url.pathname).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "asset library unavailable" })); } });
+			return;
+		}
 		void agentHandler(req, res, url.pathname).then((handled) => { if (!handled && !res.writableEnded) { res.writeHead(404); res.end(); } }).catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(JSON.stringify({ error: "agent unavailable" })); } });
 		return;
 	}
