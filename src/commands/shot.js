@@ -1,6 +1,6 @@
 // One semantic entry point for timeline, camera controls and agent framing.
 import { createCameraBlock, updateCameraBlock, removeCameraRail } from '../camera-block.js';
-import { addShotAtFrame, cutAtFrame, duplicateShot, removeShot, reorderShot, resizeShot, renameShot, moveCameraKey, removeCameraKey } from '../cuts.js';
+import { addShotAtFrame, createShot, cutAtFrame, duplicateShot, removeShot, reorderShot, resizeShot, renameShot, moveCameraKey, removeCameraKey } from '../cuts.js';
 import { createStableItemId, updateStableItem } from '../stable-items.js';
 import { railFollowForNewGeometry } from '../camera-rail-schedule.js';
 import { studioActionDeclaration } from '../studio-actions.js';
@@ -29,6 +29,13 @@ const extra = [
   { ...mutation('shot.replace', 'Replace shot authoring', input({ shots: { type: 'array', items: { type: 'object', properties: {}, additionalProperties: true } } })), exposure: 'ui-only' },
   { ...mutation('shot.captureCamera', 'Capture camera framing', input({ shotId: id }, [])), exposure: 'ui-only' },
   { ...mutation('shot.placeCamera', 'Place camera', input(Object.fromEntries(['x', 'y', 'z', 'lookAtX', 'lookAtY', 'lookAtZ', 'focalMm'].map(key => [key, number])), [])), exposure: 'ui-only' },
+  mutation('shot.upsert', 'Upsert shot with explicit boundaries and camera', input({
+    shotId: id,
+    startFrame: frame,
+    endFrameExclusive: { type: 'integer', minimum: 1 },
+    name: { type: 'string', maxLength: 240 },
+    cameraId: { type: 'string' },
+  }, ['shotId', 'startFrame', 'endFrameExclusive'])),
 ];
 export const declarations = Object.freeze([extra[0], ...existing, ...extra.slice(1).map(entry => entry.id === 'shot.frame' ? entry : { ...entry, exposure: 'ui-only' })]);
 
@@ -78,6 +85,29 @@ export function register(registry, ports) {
     'shot.replace': ({ shots }) => owner().write(shots),
     'shot.captureCamera': args => owner().captureCamera(args.shotId),
     'shot.placeCamera': args => owner().placeCamera(args),
+    'shot.upsert': ({ shotId, startFrame, endFrameExclusive, name, cameraId }) => {
+      const endFrame = endFrameExclusive - 1;
+      if (endFrame < startFrame) fail('INVALID_ARGUMENT', `Shot ${shotId} end frame (${endFrame}) must be >= start frame (${startFrame}).`);
+      owner().write(current => {
+        const existingIndex = current.findIndex(s => s.id === shotId);
+        const shotName = typeof name === 'string' && name.trim() ? name.trim() : (existingIndex >= 0 ? current[existingIndex].name : `Shot ${shotId}`);
+        const baseShot = existingIndex >= 0 ? current[existingIndex] : createShot(shotName, startFrame, endFrame);
+        const updated = {
+          ...baseShot,
+          id: shotId,
+          name: shotName,
+          startFrame,
+          endFrame,
+          ...(cameraId !== undefined ? { cameraId } : {}),
+        };
+        if (existingIndex >= 0) {
+          const next = [...current];
+          next[existingIndex] = updated;
+          return next;
+        }
+        return [...current, updated].sort((a, b) => a.startFrame - b.startFrame);
+      });
+    },
   };
   const hasShots = state => state.shots.length > 0 || 'There are no shots yet; add one with shot.create.';
   const availability = {
