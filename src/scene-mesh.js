@@ -215,7 +215,7 @@ export function fitMeshBounds({ min, max } = {}) {
 	const width = Number(max?.x) - Number(min?.x);
 	const height = Number(max?.y) - Number(min?.y);
 	const depth = Number(max?.z) - Number(min?.z);
-	if (!Number.isFinite(height) || !(height > 0)) return null;
+	if (!Number.isFinite(height) || !(height > 0) || !Number.isFinite(width) || !(width > 0) || !Number.isFinite(depth) || !(depth > 0)) return null;
 	const fitScale = height < MESH_HEIGHT_MIN || height > MESH_HEIGHT_MAX ? MESH_DEFAULT_HEIGHT / height : 1;
 	const fittedWidth = width * fitScale;
 	const fittedHeight = height * fitScale;

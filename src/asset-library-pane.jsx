@@ -68,10 +68,10 @@ export default function AssetLibraryPane({ onPlaced, limit = DEFAULT_LIBRARY_LIM
 	const requestRef = useRef(0);
 
 	const runSearch = useCallback(async (term) => {
-		const clean = String(term ?? "").trim();
-		if (!clean) { setState({ status: "idle", cards: [], total: 0, reason: null, warnings: [] }); return; }
 		const ticket = requestRef.current + 1;
 		requestRef.current = ticket;
+		const clean = String(term ?? "").trim();
+		if (!clean) { setState({ status: "idle", cards: [], total: 0, reason: null, warnings: [] }); return; }
 		setState((previous) => ({ ...previous, status: "searching" }));
 		let receipt;
 		try {

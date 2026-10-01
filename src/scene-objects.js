@@ -386,7 +386,7 @@ export function createSceneObject(kind, existing = [], placement = {}) {
 		name,
 		renderer: kind,
 		x: TRANSFORM_LIMITS.x(Number(placement.x) || 0),
-		y: 0,
+		y: TRANSFORM_LIMITS.y(Number.isFinite(Number(placement.y)) ? Number(placement.y) : 0),
 		z: TRANSFORM_LIMITS.z(Number(placement.z) || 0),
 		rot: TRANSFORM_LIMITS.rot(Number(placement.rot) || 0),
 		rotX: 0,
@@ -442,7 +442,7 @@ export function createCutoutObject({ assetId, aspect = 1, height = CUTOUT_DEFAUL
 		name: displayName,
 		renderer: CUTOUT_KIND,
 		x: TRANSFORM_LIMITS.x(Number(placement.x) || 0),
-		y: 0,
+		y: TRANSFORM_LIMITS.y(Number.isFinite(Number(placement.y)) ? Number(placement.y) : 0),
 		z: TRANSFORM_LIMITS.z(Number(placement.z) || 0),
 		rot: TRANSFORM_LIMITS.rot(Number(placement.rot) || 0),
 		rotX: 0,
@@ -503,7 +503,9 @@ export function duplicateCutoutOptions(object) {
  */
 export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footprint, name = "", clay = false, credit = null } = {}, existing = [], placement = {}) {
 	if (typeof assetId !== "string" || !assetId) return null;
-	const meshHeight = Math.max(MESH_HEIGHT_MIN, Number(height));
+	const rawHeight = Number(height);
+	if (!Number.isFinite(rawHeight) || rawHeight <= 0) return null;
+	const meshHeight = Math.max(MESH_HEIGHT_MIN, rawHeight);
 	if (!Number.isFinite(meshHeight)) return null;
 	const width = Number(footprint?.width);
 	const depth = Number(footprint?.depth);
@@ -523,7 +525,7 @@ export function createMeshObject({ assetId, height = MESH_DEFAULT_HEIGHT, footpr
 		name: displayName,
 		renderer: MESH_KIND,
 		x: TRANSFORM_LIMITS.x(Number(placement.x) || 0),
-		y: 0,
+		y: TRANSFORM_LIMITS.y(Number.isFinite(Number(placement.y)) ? Number(placement.y) : 0),
 		z: TRANSFORM_LIMITS.z(Number(placement.z) || 0),
 		rot: wrapAngle(Number(placement.rot) || 0),
 		rotX: 0,

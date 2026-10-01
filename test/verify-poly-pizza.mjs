@@ -81,6 +81,14 @@ check("a share-alike licence is not silently treated as plain CC-BY", () => {
 	assert.equal(license.allows, false, "the set is a derivative work");
 });
 
+check("non-commercial and no-derivatives licences are refused and not treated as plain CC-BY", () => {
+	for (const lic of ["CC-BY-NC 4.0", "CC-BY-ND 3.0", "CC-BY-NC-ND 4.0", "CC-BY-NC-SA 4.0"]) {
+		const parsed = polyLicenseOf({ Licence: lic });
+		assert.equal(parsed.allows, false, `${lic} must not be allowed`);
+		assert.notEqual(parsed.id, "cc-by", `${lic} must not be identified as cc-by`);
+	}
+});
+
 check("an unstated or unreadable licence is refused, never defaulted permissive", () => {
 	for (const raw of [{}, { Licence: "" }, { Licence: "All rights reserved" }, null]) {
 		const license = polyLicenseOf(raw);

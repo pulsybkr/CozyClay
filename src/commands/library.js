@@ -46,6 +46,7 @@ export const declarations = Object.freeze([
 				attribution: { type: "string", maxLength: 400 },
 				triCount: { type: "integer", minimum: 0 },
 				heightHint: { type: "number", minimum: 0.05, maximum: 10 },
+				hint: { type: "number", minimum: 0.05, maximum: 10 },
 				height: { type: "number", minimum: 0.05, maximum: 10 },
 				x: { type: "number" }, y: { type: "number" }, z: { type: "number" }, rot: { type: "number" },
 				name: { type: "string", minLength: 1, maxLength: 120 },
@@ -139,7 +140,8 @@ export function register(registry, ports) {
 					...(Object.keys(placement).length ? { placement } : {}),
 					...(args.name === undefined ? {} : { displayName: args.name }),
 					...(Number.isFinite(args.height) ? { height: args.height } : {}),
-					hint: args.heightHint ?? polyHeightHint(model),
+					heightHint: args.heightHint ?? args.hint ?? polyHeightHint(model),
+					hint: args.heightHint ?? args.hint ?? polyHeightHint(model),
 				}, context);
 			} catch (error) {
 				fail(error.code ?? "INVALID_ARGUMENT", `Not imported: ${error?.message || error}`);

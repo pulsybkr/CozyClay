@@ -1,7 +1,8 @@
 import { constants as fsConstants } from "node:fs";
-import { open as openFile } from "node:fs/promises";
+import { lstat, open as openFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { ASSET_MAX_SOURCE_BYTES } from "../src/scene-assets.js";
 import { classifyMeshBytes, meshMimeForKind } from "../src/mesh-sniff.js";
@@ -11,8 +12,7 @@ export function normalizeMeshPath(raw, { home = homedir() } = {}) {
 	let path = raw.trim();
 	if (path.startsWith("file:")) {
 		try {
-			const url = new URL(path);
-			if (url.protocol === "file:") path = decodeURIComponent(url.pathname);
+			path = fileURLToPath(path);
 		} catch {
 			path = path.replace(/^file:\/\//, "");
 		}
@@ -24,6 +24,10 @@ export function normalizeMeshPath(raw, { home = homedir() } = {}) {
 
 export async function readMeshFromPath(raw) {
 	const path = normalizeMeshPath(raw);
+	const linkStat = await lstat(path).catch(() => null);
+	if (linkStat?.isSymbolicLink()) {
+		throw new Error("Symbolic links are not allowed.");
+	}
 	let file;
 	try {
 		file = await openFile(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);

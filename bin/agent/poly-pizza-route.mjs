@@ -107,31 +107,71 @@ export function createPolyPizzaRoute({ env = process.env, keys = null, fetchImpl
 
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), POLY_TIMEOUT_MS);
+		const onReqClose = () => {
+			if (!controller.signal.aborted) controller.abort();
+		};
+		if (typeof req.on === "function") req.on("close", onReqClose);
+
 		let response;
 		try {
-			response = await fetchImpl(upstreamUrl(request), {
+			const upstream = upstreamUrl(request);
+			if (!upstream.startsWith(POLY_API_BASE)) {
+				write(400, { error: "Invalid upstream URL." });
+				return true;
+			}
+			response = await fetchImpl(upstream, {
 				signal: controller.signal,
 				headers: { "x-auth-token": key, accept: "application/json" },
 			});
+			if (!response?.ok) {
+				const failure = failureFor(response?.status ?? 502);
+				write(failure.status, { error: failure.error });
+				return true;
+			}
+
+			let text;
+			if (response.body && typeof response.body.getReader === "function") {
+				const reader = response.body.getReader();
+				const decoder = new TextDecoder();
+				let receivedBytes = 0;
+				let chunks = "";
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					receivedBytes += value.byteLength;
+					if (receivedBytes > MAX_RESPONSE_BYTES) {
+						await reader.cancel();
+						write(502, { error: "The 3D library sent more than this studio will read at once." });
+						return true;
+					}
+					chunks += decoder.decode(value, { stream: true });
+				}
+				chunks += decoder.decode();
+				text = chunks;
+			} else {
+				text = await response.text();
+				if (text.length > MAX_RESPONSE_BYTES) {
+					write(502, { error: "The 3D library sent more than this studio will read at once." });
+					return true;
+				}
+			}
+
+			try {
+				write(200, JSON.parse(text));
+			} catch {
+				write(502, { error: "The 3D library sent an unreadable answer." });
+			}
+			return true;
 		} catch (error) {
-			write(504, { error: error?.name === "AbortError" ? "Poly Pizza did not answer in time." : "Poly Pizza could not be reached." });
+			if (error?.name === "AbortError" || controller.signal.aborted) {
+				write(504, { error: "Poly Pizza did not answer in time." });
+				return true;
+			}
+			write(502, { error: "Poly Pizza could not be reached." });
 			return true;
 		} finally {
 			clearTimeout(timer);
+			if (typeof req.removeListener === "function") req.removeListener("close", onReqClose);
 		}
-
-		if (!response?.ok) { const failure = failureFor(response?.status ?? 502); write(failure.status, { error: failure.error }); return true; }
-		let text;
-		try { text = await response.text(); } catch { write(502, { error: "The 3D library sent an unreadable answer." }); return true; }
-		if (text.length > MAX_RESPONSE_BYTES) { write(502, { error: "The 3D library sent more than this studio will read at once." }); return true; }
-		// Re-serialise rather than pass the bytes through: the panel parses JSON,
-		// and an upstream error page that happens to be 200 must not reach it as
-		// if it were a result list.
-		try {
-			write(200, JSON.parse(text));
-		} catch {
-			write(502, { error: "The 3D library sent an unreadable answer." });
-		}
-		return true;
 	};
 }

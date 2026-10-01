@@ -402,17 +402,26 @@ export function useObjects(appContext) {
 		// height overrides it, and the kind's hint fills in when the measurement
 		// is only the 1 m fallback the import heuristic produces for a file
 		// authored in centimetres or city units.
-		const fitted = resolvePolyObjectHeight({ measured: height, hint: args.heightHint, requested: args.height });
-		const placement = args.placement ?? placementInFrontOfShot();
+		const fitted = resolvePolyObjectHeight({ measured: height, hint: args.heightHint ?? args.hint, requested: args.height });
+		if (!Number.isFinite(fitted) || fitted <= 0) throw new StudioProtocolError("INVALID_ARGUMENT", "Invalid object height.");
+		const scaleFactor = (Number.isFinite(height) && height > 0) ? fitted / height : 1;
+		const scaledFootprint = (footprint && Number.isFinite(scaleFactor) && scaleFactor > 0)
+			? {
+				width: Number(footprint.width) * scaleFactor,
+				depth: Number(footprint.depth) * scaleFactor,
+			}
+			: footprint;
+		const placement = { ...(args.placement ?? placementInFrontOfShot()) };
+		if (Number.isFinite(args.y) && !Number.isFinite(placement.y)) placement.y = args.y;
 		let object = createMeshObject(
-			{ assetId: asset.id, height: fitted, footprint, name: meshNameFromFile(args.displayName || name), credit },
+			{ assetId: asset.id, height: fitted, footprint: scaledFootprint, name: meshNameFromFile(args.displayName || name), credit },
 			domain.read(),
 			placement,
 		);
 		if (!object) throw new StudioProtocolError("INVALID_ARGUMENT", "Could not create the model object.");
 		// A requested y lifts the model onto a surface instead of standing it on
 		// the deck, and it rides the same single commit.
-		if (Number.isFinite(args.y)) object = updateSceneObject([object], object.id, { y: args.y })[0];
+		if (Number.isFinite(args.y) && object.y !== args.y) object = updateSceneObject([object], object.id, { y: args.y })[0];
 		const published = publishImported(object, commandContext);
 		appContext.notify(
 			isKo
@@ -720,6 +729,9 @@ export function useObjects(appContext) {
 					? placementInFront({ x: camera.position.x, z: camera.position.z }, appContext.shared.look.current.yaw)
 					: {};
 			if (Number.isFinite(args.rot)) placement.rot = args.rot;
+			if (Number.isFinite(args.x)) placement.x = args.x;
+			if (Number.isFinite(args.y)) placement.y = args.y;
+			if (Number.isFinite(args.z)) placement.z = args.z;
 			let object = createMeshObject(
 				{
 					assetId: asset.id,

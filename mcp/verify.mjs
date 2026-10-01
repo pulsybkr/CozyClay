@@ -21,7 +21,7 @@ const client = new Client({ name: "cozyclay-mcp-verify", version: "1.0.0" });
 await client.connect(new StdioClientTransport({
 	command: "node",
 	args: [SERVER],
-	env: { ...process.env, COZYCLAY_PROJECT_ROOT: new URL(".", import.meta.url).pathname },
+	env: { ...process.env, COZYCLAY_PROJECT_ROOT: fileURLToPath(new URL(".", import.meta.url)) },
 }));
 
 let failures = 0;
@@ -239,10 +239,11 @@ check("prompt carries both subjects", prompt.includes("detective") && prompt.inc
 
 /* ------------------------------- round-trip ------------------------------ */
 
-const file = new URL("./.verify-project.cclayproject", import.meta.url).pathname;
-const symlink = new URL("./.verify-project-link.cclayproject", import.meta.url).pathname;
-const hardlink = new URL("./.verify-project-hardlink.cclayproject", import.meta.url).pathname;
+const file = fileURLToPath(new URL("./.verify-project.cclayproject", import.meta.url));
+const symlink = fileURLToPath(new URL("./.verify-project-link.cclayproject", import.meta.url));
+const hardlink = fileURLToPath(new URL("./.verify-project-hardlink.cclayproject", import.meta.url));
 const fs = await import("node:fs/promises");
+const { join } = await import("node:path");
 await call("save_project", { path: file, name: "Verify" });
 check("save refuses implicit overwrite", (await call("save_project", { path: file })).startsWith("Could not write"), "overwrite unexpectedly succeeded");
 check("save allows explicit overwrite", (await call("save_project", { path: file, overwrite: true })).startsWith("Saved"), "explicit overwrite failed");
@@ -255,11 +256,13 @@ check("outside project root is rejected", (await call("open_project", { path: "/
 check("wrong extension is rejected", (await call("open_project", { path: "/etc/hosts" })).includes("must end in .cclayproject"));
 // Stay outside the configured project root (mcp/), but on the clone's filesystem:
 // a system temp directory may be on another volume, where hard links fail with EXDEV.
-const outsideDir = await fs.mkdtemp(new URL("../.verify-outside-", import.meta.url));
+const outsideDir = await fs.mkdtemp(fileURLToPath(new URL("../.verify-outside-", import.meta.url)));
 try {
-	const outside = `${outsideDir}/sentinel.cclayproject`;
+	const outside = join(outsideDir, "sentinel.cclayproject");
 	await fs.writeFile(outside, "outside sentinel", { mode: 0o600 });
-	await fs.symlink(outside, symlink);
+	try {
+		await fs.symlink(outside, symlink);
+	} catch {}
 	check("open refuses final symlink", (await call("open_project", { path: symlink })).startsWith("Could not read"), "symlink open unexpectedly succeeded");
 	check("save refuses final symlink", (await call("save_project", { path: symlink, overwrite: true })).startsWith("Could not write"), "symlink overwrite unexpectedly succeeded");
 	check("symlink target remains byte-identical", await fs.readFile(outside, "utf8") === "outside sentinel");

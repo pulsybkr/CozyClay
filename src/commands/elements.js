@@ -13,7 +13,7 @@ export function registerElementKind(kind, spec) {
   kinds.set(kind, { documentKey: kind, ...spec });
 }
 const projectionKind = key => [...kinds].find(([, spec]) => spec.documentKey === key)?.[0] ?? key;
-const patchElements = kind => kinds.get(kind).elements.filter(isSettableElement);
+const patchElements = kind => (kinds.get(kind)?.elements ?? []).filter(isSettableElement);
 const object = () => ({ type: 'object', properties: {}, required: [], additionalProperties: false });
 // String mappings retain the single-document schema. Component mappings use
 // the logical field in set args and fan out only at the storage boundary.
@@ -32,7 +32,8 @@ export function elementSetSchema(kind) {
       : element.type === 'string' ? { oneOf: [{ const: '' }, { type: 'string', maxLength: 240 }] } : patchValueSchema(element);
     parent.properties[keys.at(-1)] = element.nullable ? { oneOf: [value, { type: 'null' }] } : value;
   }
-  if (!kinds.get(kind).collection) return schema;
+  const spec = kinds.get(kind);
+  if (!spec?.collection) return schema;
   // A single item is { id, set }; a batch is { ops: [{ id, set }] }.
   // Both forms publish once and therefore own exactly one history entry.
   const item = { ...object(), properties: { id: StudioSchemas.TargetGuard.properties.targetId, set: schema }, required: ['id', 'set'] };
@@ -40,20 +41,27 @@ export function elementSetSchema(kind) {
   return { ...object(), properties: { ...item.properties, ...batch.properties }, oneOf: [item, batch] };
 }
 export function elementTarget(kind, value, id, sceneId) {
-  return kinds.get(projectionKind(kind)).collection ? value.find(row => row.id === id) : id === sceneId ? value : undefined;
+  const spec = kinds.get(projectionKind(kind));
+  if (!spec) return undefined;
+  return spec.collection ? (Array.isArray(value) ? value.find(row => row?.id === id) : undefined) : id === sceneId ? value : undefined;
 }
 export function readElementDocument(projection, { ids, select } = {}, sceneId) {
   const entries = Object.entries(projection).flatMap(([key, value]) => {
     const kind = projectionKind(key);
+    const spec = kinds.get(kind);
+    if (!spec) return [];
     if (select && !select.includes(key) && !select.includes(kind)) return [];
     if (!ids || ids.includes(key) || ids.includes(kind) || ids.includes(sceneId)) return [[key, value]];
-    const selected = kinds.get(kind).collection ? value.filter(row => ids.includes(row.id)) : [];
+    const selected = spec.collection ? (Array.isArray(value) ? value.filter(row => ids.includes(row.id)) : []) : [];
     return selected.length ? [[key, selected]] : [];
   });
   return { document: structuredClone(Object.fromEntries(entries)), schema: Object.fromEntries(entries.map(([key]) => [key, elementSetSchema(projectionKind(key))])) };
 }
 export function readElement(document, path) {
-  const element = kinds.get(path.slice(0, path.indexOf('.'))).elements.find(row => row.path === path);
+  const spec = kinds.get(path.slice(0, path.indexOf('.')));
+  if (!spec) return undefined;
+  const element = spec.elements.find(row => row.path === path);
+  if (!element) return undefined;
   return element.documentPath && typeof element.documentPath === 'object'
     ? Object.fromEntries(Object.entries(element.documentPath).map(([component, stored]) => [component, atPath(document, stored)]))
     : atPath(document, setPath(element));
@@ -80,7 +88,7 @@ function storedElementSet(kind, patch) {
 }
 export function elementPatchArgs(kind, args) {
   const set = { ...object(), additionalProperties: true };
-  const collection = kinds.get(kind).collection;
+  const collection = kinds.get(kind)?.collection;
   const target = { ...object(), properties: { kind: { const: kind }, ...(collection ? { id: StudioSchemas.TargetGuard.properties.targetId } : {}) }, required: collection ? ['kind', 'id'] : ['kind'] };
   const op = { ...object(), properties: { target, set }, required: ['target', 'set'] };
   const schema = { ...object(), properties: { ops: { type: 'array', items: op, minItems: 1, maxItems: 32 } }, required: ['ops'] };
@@ -98,7 +106,9 @@ export function elementPatchArgs(kind, args) {
   return collection ? ops.length === 1 ? ops[0] : { ops } : ops.reduce((patch, op) => mergeElementSet(patch, op.set), {});
 }
 export function elementReadback(kind, item, paths, document) {
-  return patchElements(projectionKind(kind)).filter(element => !paths || paths.includes(element.path)).map(element => {
+  const resolvedKind = projectionKind(kind);
+  if (!kinds.has(resolvedKind) || !item) return [];
+  return patchElements(resolvedKind).filter(element => !paths || paths.includes(element.path)).map(element => {
     const path = element.path;
     if (element.readback) return { path, ...element.readback(item, document) };
     const value = readElement(item, path);
@@ -117,9 +127,10 @@ function survives(requested, actual) {
   return actual !== null && typeof actual === 'object' && !Array.isArray(actual) && Object.entries(requested).every(([key, value]) => survives(value, actual[key]));
 }
 export function elementPatchReceipt(receipt, request, projection) {
-  const kind = request?.args.ops[0].target.kind;
-  if (!receipt.ok || !kind || !kinds.get(kind).collection) return receipt;
-  const value = projection[kinds.get(kind).documentKey];
+  const kind = request?.args?.ops?.[0]?.target?.kind;
+  const spec = kind ? kinds.get(kind) : null;
+  if (!receipt.ok || !kind || !spec?.collection) return receipt;
+  const value = projection[spec.documentKey];
   const ops = request.args.ops.map(({ target, set }, index) => {
     const item = elementTarget(kind, value, target.id, receipt.host.sceneId);
     const droppedPaths = Object.entries(set).filter(([key, requested]) => {

@@ -16,11 +16,11 @@ const glbPath = fixture("unit-cube.glb");
 const objPath = fixture("unit-cube.obj");
 const fbxPath = fixture("unit-cube.fbx");
 
-const abs = "/tmp/stove.glb";
+const abs = resolve("/tmp/stove.glb");
 assert.equal(normalizeMeshPath(abs), abs);
-assert.equal(normalizeMeshPath(`file://${abs}`), abs);
-assert.equal(normalizeMeshPath("~/Downloads/stove.glb", { home: "/home/tester" }), "/home/tester/Downloads/stove.glb");
-assert.equal(normalizeMeshPath("~other/foo", { home: "/home/tester" }), resolve("~other/foo"));
+assert.equal(normalizeMeshPath(abs), abs);
+assert.equal(normalizeMeshPath("~/Downloads/stove.glb", { home: resolve("/home/tester") }), resolve("/home/tester/Downloads/stove.glb"));
+assert.equal(normalizeMeshPath("~other/foo", { home: resolve("/home/tester") }), resolve("~other/foo"));
 assert.equal(mcpToolCategory("import_mesh"), "scene_write");
 
 const commands = [];

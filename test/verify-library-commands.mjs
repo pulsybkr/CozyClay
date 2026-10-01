@@ -13,6 +13,8 @@ import assert from "node:assert/strict";
 
 import { declarations, register } from "../src/commands/library.js";
 import { normalizePolyModel } from "../src/poly-pizza.js";
+import { createMeshObject } from "../src/scene-objects.js";
+import { fitMeshBounds } from "../src/scene-mesh.js";
 
 const checks = [];
 const check = (name, fn) => { fn(); checks.push(name); };
@@ -265,6 +267,32 @@ await checkAsync("the answer carries the attribution an export needs", async () 
 	assert.equal(result.output.sourceUrl, "https://poly.pizza/m/iMNqRzPwwe");
 	assert.equal(result.output.triCount, 216);
 	assert.match(result.summary, /216 triangles/);
+});
+
+await checkAsync("a requested y lifts the model and is preserved in placement", async () => {
+	const { ports, domain } = portsFor();
+	const r = registry();
+	register(r, ports);
+	await r.run("asset.downloadLibraryModel", {
+		id: "iMNqRzPwwe", title: "Chair", license: "CC0 1.0", downloadUrl: "https://static.poly.pizza/x.glb",
+		y: 0.75,
+	}, commitContext());
+	assert.equal(domain.lastArgs.placement.y, 0.75);
+});
+
+check("createMeshObject rejects degenerate heights and preserves placement.y", () => {
+	assert.equal(createMeshObject({ assetId: "a", height: 0 }), null);
+	assert.equal(createMeshObject({ assetId: "a", height: -1 }), null);
+	assert.equal(createMeshObject({ assetId: "a", height: NaN }), null);
+	const obj = createMeshObject({ assetId: "a", height: 1.0, footprint: { width: 1.5, depth: 0.8 } }, [], { y: 0.75 });
+	assert.equal(obj.y, 0.75);
+	assert.deepEqual(obj.footprint, { width: 1.5, depth: 0.8 });
+});
+
+check("fitMeshBounds rejects degenerate dimensions", () => {
+	assert.equal(fitMeshBounds({ min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 1, z: 1 } }), null);
+	assert.equal(fitMeshBounds({ min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 0, z: 1 } }), null);
+	assert.equal(fitMeshBounds({ min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 0 } }), null);
 });
 
 console.log(`library commands: ${checks.length} checks passed`);

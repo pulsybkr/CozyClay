@@ -57,23 +57,40 @@ function httpUrl(value) {
 export function polyLicenseOf(raw) {
 	const declared = text(raw?.Licence ?? raw?.license, 60);
 	if (!declared) return { id: "unknown", label: "Unknown", url: "", allows: false, requiresAttribution: true };
-	const normalized = declared.toLowerCase().replace(/\s+/g, "");
-	if (normalized.startsWith("cc0") || normalized.startsWith("publicdomain")) {
+	const normalized = declared.toLowerCase().replace(/[\s_]+/g, "-");
+	if (normalized === "cc0" || normalized.startsWith("cc0-") || normalized.startsWith("cc-0") || normalized.includes("publicdomain") || normalized === "public-domain") {
 		return { id: "cc0", label: declared, url: "https://creativecommons.org/publicdomain/zero/1.0/", allows: true, requiresAttribution: false };
 	}
-	if (normalized.startsWith("cc-by")) {
-		// "CC-BY 3.0" / "CC-BY 4.0" both land on the versioned deed when the
-		// record states one, and on the unversioned deed when it does not.
-		const version = normalized.match(/cc-by(-sa)?-?(\d+(?:\.\d+)?)/)?.[2];
-		const shareAlike = normalized.includes("cc-by-sa") || normalized.includes("sharealike");
-		const deed = shareAlike ? "by-sa" : "by";
-		return {
-			id: shareAlike ? "cc-by-sa" : "cc-by",
-			label: declared,
-			url: version ? `https://creativecommons.org/licenses/${deed}/${version}/` : `https://creativecommons.org/licenses/${deed}/`,
-			allows: !shareAlike,
-			requiresAttribution: true,
-		};
+	if (normalized.startsWith("cc-")) {
+		const versionMatch = normalized.match(/(\d+(?:\.\d+)?)/);
+		const version = versionMatch ? versionMatch[1] : null;
+		const hasNC = /(-|\b)nc(\b|-)/.test(normalized) || normalized.includes("noncommercial");
+		const hasND = /(-|\b)nd(\b|-)/.test(normalized) || normalized.includes("noderivatives");
+		const hasSA = /(-|\b)sa(\b|-)/.test(normalized) || normalized.includes("sharealike");
+
+		if (hasNC || hasND || hasSA) {
+			const parts = ["by"];
+			if (hasNC) parts.push("nc");
+			if (hasND) parts.push("nd");
+			if (hasSA) parts.push("sa");
+			const deed = parts.join("-");
+			return {
+				id: `cc-${deed}`,
+				label: declared,
+				url: version ? `https://creativecommons.org/licenses/${deed}/${version}/` : `https://creativecommons.org/licenses/${deed}/`,
+				allows: false,
+				requiresAttribution: true,
+			};
+		}
+		if (/^cc-?by(-?\d+(\.\d+)?)?$/.test(normalized)) {
+			return {
+				id: "cc-by",
+				label: declared,
+				url: version ? `https://creativecommons.org/licenses/by/${version}/` : "https://creativecommons.org/licenses/by/",
+				allows: true,
+				requiresAttribution: true,
+			};
+		}
 	}
 	// Anything else — a no-derivatives, a bare link — is carried through
 	// verbatim and refused, because the set is a derivative work.

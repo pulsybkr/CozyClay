@@ -18,7 +18,7 @@
  * owns it, and `liveHub` is a live binding the owner installs with setLiveHub,
  * so every handler sees the editor connection the moment it exists.
  */
-import { link, open as openFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
+import { link, lstat, open as openFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { constants as fsConstants, readdirSync, statSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -528,6 +528,8 @@ export const createToolHandlers = ({ projectRootPromise } = {}) => {
 		const name = basename(requested);
 		if (!name || name.includes("/")) throw new Error("Project filename is invalid.");
 		if (existing) {
+			const linkStat = await lstat(name).catch(() => null);
+			if (linkStat?.isSymbolicLink()) throw new Error("Symbolic links are not allowed.");
 			const file = await openFile(name, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
 			try {
 				await requirePrivateProjectInode(file);
@@ -1723,6 +1725,8 @@ export const createToolHandlers = ({ projectRootPromise } = {}) => {
 				try {
 					if (overwrite) {
 						try {
+							const linkStat = await lstat(path).catch(() => null);
+							if (linkStat?.isSymbolicLink()) throw new Error("Symbolic links are not allowed.");
 							const existing = await openFile(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
 							try {
 								await requirePrivateProjectInode(existing);
