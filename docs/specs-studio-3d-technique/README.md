@@ -21,6 +21,8 @@ La récupération ne lance aucune génération d’avatar ou de mouvement. Une �
 | [07 — Lots et consignes aux sous-agents](07-lots-et-recette.md) | Missions bornées, fichiers, dépendances, livrables et conditions de fusion |
 | [09 — Correctifs API distante et recette](09-api-distante-corrections-et-recette.md) | Priorités actuelles, fichiers réels, contrats de publication et tests à exécuter |
 | [08 — Adaptation du dépôt distant](08-adaptation-depot-distant.md) | Fichiers FastAPI réels, mapping de reproduction, préparation et publication |
+| [10 — Préparation 3D par IA](10-preparation-3d-par-ia.md) | Backend, jobs, contrats, capacités, revue, régénération et recette |
+| [11 — Prompts complets](11-prompts-preparation-3d.md) | Système commun et sept étapes, schémas de sortie et variables à injecter |
 
 L’audit précédent reste la liste des problèmes et de leurs preuves : [audit](../audit-studio-3d/01-audit.md).
 
