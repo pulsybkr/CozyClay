@@ -38,6 +38,16 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
     const inner = name === "run_action" ? args?.args : args;
     return typeof inner?.characterId === "string" && inner.characterId ? inner.characterId : null;
   };
+  // The retry budget is per character for the same reason the cap is: two
+  // failed attempts for Alex say nothing about Marie, and a message-level
+  // budget let one performer's broken rig spend the other's allowance.
+  const failuresFor = target => (target ? (generationCharacters.get(target)?.failures ?? 0) : (generationGate.failures ?? 0));
+  const noteFailure = target => {
+    if (target) {
+      const entry = generationCharacters.get(target) ?? {};
+      generationCharacters.set(target, { ...entry, failures: (entry.failures ?? 0) + 1 });
+    } else generationGate.failures = (generationGate.failures ?? 0) + 1;
+  };
   const invoke = async (name, args) => {
     const command = validateStudioCommand({ name, args });
     if (name === 'generate_motion' && command.args.source.kind === 'generate') return invoke('run_action', { action: 'motion.generate', args: generationArgs(command.args) });
@@ -48,10 +58,12 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
       const target = motionTarget(name, command.args);
       // A named character is judged on its own entry; an unnamed action is
       // judged on the message, because it could be any performer.
-      const taken = target ? generationCharacters.has(target) : generationGate.used;
+      const taken = target ? generationCharacters.get(target)?.used === true : generationGate.used;
       if (taken || generationGate.pending) throw new StudioProtocolError("GENERATION_LIMIT", "One motion generation per user message. Report this result and ask the user before generating again. A different character may still be generated in this message: pass its characterId to generate_motion.");
+      if (failuresFor(target) >= 2) throw new StudioProtocolError("GENERATION_LIMIT", target
+        ? `Two motion generation attempts already failed for ${target} in this user message. Report both failures to the user and ask before generating for this character again; another character may still be generated.`
+        : "Two motion generation attempts already failed in this user message. Report both failures to the user and ask before generating again.");
     }
-    if (generation && (generationGate.failures ?? 0) >= 2) throw new StudioProtocolError("GENERATION_LIMIT", "Two motion generation attempts already failed in this user message. Report both failures to the user and ask before generating again.");
     const payload = mutationNames.has(name) && session?.admission
       ? { name, args: command.args, commandId: session.admission.commandId(), host: session.admission.host, expectedRevision: session.admission.revision,
           ...(generation && session.onJob ? { wait: false } : {}) }
@@ -77,7 +89,7 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
     } catch (error) {
       // A STALE_SCENE re-admits whichever family met it, so the retry the
       // model is told to make is admitted at the live revision.
-      if (generation) generationGate.failures = (generationGate.failures ?? 0) + 1;
+      if (generation) noteFailure(motionTarget(name, command.args));
       if (session?.admission && (error?.code === "STALE_SCENE" || (mutationNames.has(name) && error?.code === "UNCERTAIN_APPLY"))) await session.admission.refresh();
       throw error;
     } finally { if (generation) generationGate.pending = false; }
@@ -86,7 +98,7 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
       // the receipt itself holds phase, recovery and target evidence the model needs.
       const code = result.code ?? result.error?.code;
       const message = result.message ?? result.error?.message ?? "Studio command failed";
-      if (generation) generationGate.failures = (generationGate.failures ?? 0) + 1;
+      if (generation) noteFailure(motionTarget(name, command.args));
       if (session?.admission && (code === "STALE_SCENE" || result.mutated === true)) await session.admission.refresh();
       // An acknowledged Stop must settle its held card with the bus outcome,
       // not turn a proved cancellation into an interrupted/unknown tool.
@@ -100,7 +112,7 @@ export function createStudioTools({ liveHub, workspaceHandle, session, resolveIm
       // the character it touched — recording it keeps the ledger honest, so a
       // later regeneration of that same performer is still refused.
       const touched = motionTarget(name, command.args) ?? (Array.isArray(result?.affectedIds) ? result.affectedIds.find(id => typeof id === "string" && id) : null);
-      if (touched) generationCharacters.set(touched, true);
+      if (touched) generationCharacters.set(touched, { ...(generationCharacters.get(touched) ?? {}), used: true });
     }
     // A scene action that opened another scene answers the new host; later
     // commands in this turn are admitted there, never in another workspace.

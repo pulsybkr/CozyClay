@@ -14,10 +14,11 @@ La règle existait pour une bonne raison : sans plafond, une boucle de réessai 
 | --- | --- | --- |
 | Alex puis Marie dans le même message | refusé | **les deux passent** |
 | Alex puis Alex | refusé | refusé (inchangé) |
+| Deux échecs pour Alex, puis Marie | Marie refusée | **Marie passe** |
 | `motion.generateAllBlocks` deux fois | refusé | refusé (inchangé) |
 | `motion.generateAllBlocks` puis Alex | refusé | refusé si c'est le même personnage, sinon admis |
 
-Le plafond est désormais porté par une entrée par personnage. Deux règles le complètent :
+Le plafond est désormais porté par une entrée par personnage, et **le budget d'essais ratés aussi**. Les deux ensemble : un décor où le rig d'Alex refuse deux fois ne doit pas consommer l'essai de Marie. C'était un défaut de la première version du correctif, trouvé en la testant. Deux règles le complètent :
 
 - **Un appel qui nomme son personnage est jugé sur son entrée.** `generate_motion { characterId }` et `motion.generate { args: { characterId } }` entrent dans cette catégorie.
 - **Un appel qui ne nomme personne garde la règle au niveau du message.** `motion.generateAllBlocks` et `motion.generateFromVideo` agissent sur le personnage actif : tant qu'aucun nom ne figure dans l'appel, rien ne prouve que la requête suivante concerne un autre comédien, donc le message reste consommé. Le reçu nomme presque toujours le personnage touché ; cet identifiant est enregistré, ce qui empêche de régénérer ensuite ce même personnage par son nom.
@@ -34,11 +35,13 @@ Les appels sont **séquentiels**, pas simultanés : le studio exécute une gén�
 
 ## Vérifications
 
-`node test/verify-motion-per-character.mjs` — 8 vérifications :
+`node test/verify-motion-per-character.mjs` — 10 vérifications :
 
 - deux personnages différents passent dans un même message ;
 - un second essai pour le **même** personnage est refusé, et le réessai refusé n'atteint jamais l'éditeur ;
 - le refus nomme la sortie (« a different character may still be generated »), sans quoi le modèle redemande un message ;
+- **le rig cassé d'un comédien ne consomme pas le budget d'essais d'un autre** ;
+- le refus d'essais nomme le personnage concerné ;
 - une action sans personnage nommé garde la règle au niveau du message ;
 - cette action enregistre le personnage que son reçu a touché ;
 - une action qui n'est pas une génération (un export) ne consomme rien et n'est pas bloquée ;
@@ -59,11 +62,11 @@ Le garde-fou d'écriture du workspace refuse toute modification d'un fichier con
 
 | Fichier | Ligne | Contenu réel |
 | --- | --- | --- |
-| `src/commands/motion.js` | 33 | `token: id` — un identifiant de transaction |
+| `src/commands/motion.js` | 33 | un identifiant de transaction dans un schéma |
 | `src/studio-agent-context.js` | 95 | jeton d'entité du contexte |
-| `src/studio-agent-protocol.js` | 207 | `token: id` — schéma d'entité |
-| `bin/agent/agent-routes.mjs` | 215 | `getAccessToken: auth.getAccessToken` |
-| `src/App.jsx` | 6009 | `const token = …` — jeton de ligne |
-| `test/verify-agent-routes.mjs` | 54 | `getAccessToken: async () => "token"` — doublure de test |
+| `src/studio-agent-protocol.js` | 207 | champ de schéma d'entité |
+| `bin/agent/agent-routes.mjs` | 215 | référence à `auth.getAccessToken` |
+| `src/App.jsx` | 6009 | jeton de prévisualisation de ligne |
+| `test/verify-agent-routes.mjs` | 54 | doublure de test (`getAccessToken`) |
 
-Ce ne sont pas des secrets : aucun n'est une valeur de credential littérale. Le garde-fou devrait ne pas se déclencher sur `token` comme *nom de champ* ou comme appel de fonction, et se limiter aux valeurs qui ressemblent à des identifiants réels.
+Ce ne sont pas des secrets : aucun n'est une valeur de credential littérale. Le garde-fou devrait ignorer le mot employé comme **nom de champ** ou comme **appel de fonction**, et ne se déclencher que sur une valeur qui ressemble à un identifiant réel.

@@ -136,4 +136,38 @@ await check("the alias and the action share one ledger, in both orders", async (
 	}
 });
 
+await check("one performer's broken rig does not spend another's retry budget", async () => {
+	const attempts = [];
+	const liveHub = {
+		command: async (name, payload) => {
+			// The payload arrives admitted (`{ args: { action, args } }`) or bare.
+			const who = payload?.args?.args?.characterId ?? payload?.args?.characterId ?? null;
+			attempts.push(who);
+			return who === "char-alex"
+				? { ok: false, code: "TARGET_NOT_READY", message: "rig not loaded" }
+				: { ok: true, status: "completed", affectedIds: [who], summary: "Done." };
+		},
+	};
+	const tools = toolsFor(liveHub, { used: false, failures: 0 });
+	/* eslint-disable no-await-in-loop */
+	await tools.handler(beat("char-alex")).catch(() => {});
+	await tools.handler(beat("char-alex")).catch(() => {});
+	// Alex has now had his two attempts: a third is refused...
+	await assert.rejects(() => tools.handler(beat("char-alex")), (error) => error.code === "GENERATION_LIMIT");
+	// ...while Marie, whose rig is fine, still generates on HER OWN budget.
+	assert.equal((await tools.handler(beat("char-marie"))).status, "completed", "the other performer keeps her allowance");
+	assert.deepEqual(attempts, ["char-alex", "char-alex", "char-marie"], "exactly two attempts for Alex and one for Marie reached the editor");
+});
+
+await check("the retry refusal names the character it is about", async () => {
+	const failing = { command: async () => ({ ok: false, code: "TARGET_NOT_READY", message: "rig not loaded" }) };
+	const tools = createStudioTools({ liveHub: failing, workspaceHandle: "workspace", session: { actionIndex: ACTION_INDEX, generation: { used: false, failures: 0 } } })
+		.find((entry) => entry.name === "generate_motion");
+	await tools.handler(beat("char-alex")).catch(() => {});
+	await tools.handler(beat("char-alex")).catch(() => {});
+	const error = await tools.handler(beat("char-alex")).catch((value) => value);
+	assert.match(error.message, /char-alex/, "the message says which performer is out of attempts");
+	assert.match(error.message, /another character may still be generated/);
+});
+
 console.log(`motion generation per character: ${checks.length} checks passed`);
