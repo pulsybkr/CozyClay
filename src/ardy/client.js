@@ -47,38 +47,14 @@ async function healthPayload(res) {
  * failure (no sidecar running) is a UI state, not a crash.
  */
 export async function checkBridge() {
-	try {
-		const res = await fetch("/ardy/health", { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-		const payload = await healthPayload(res);
-		if (!res.ok) {
-			return {
-				...payload,
-				ok: false,
-				reason: payload.reason || (isKo ? `브리지 상태가 좋지 않아요(HTTP ${res.status})` : `bridge unhealthy (HTTP ${res.status})`),
-			};
-		}
-		// Health responses are authoritative. A successful HTTP status without an
-		// explicit boolean health result is malformed, never a ready bridge.
-		if (typeof payload.ok !== "boolean") return { ...payload, ok: false, reason: "invalid health response" };
-		return payload;
-	} catch (err) {
-		return { ok: false, reason: err?.message || ko("bridge unreachable", "브리지에 연결할 수 없어요") };
-	}
+	return { ok: false, disabled: true, reason: "bridge disabled" };
 }
 
 /**
- * List base motions the box reported. Returns [] when the sidecar is down —
- * the caller renders an empty state, it does not crash.
+ * List base motions the box reported. Returns [] when the sidecar is down.
  */
 export async function listBases() {
-	try {
-		const res = await fetch("/ardy/bases", { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-		if (!res.ok) return [];
-		const payload = await res.json();
-		return payload && Array.isArray(payload.bases) ? payload.bases : [];
-	} catch {
-		return [];
-	}
+	return [];
 }
 
 /**

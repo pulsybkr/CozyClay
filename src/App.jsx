@@ -21,6 +21,8 @@ import ProjectPanel from "./panels/ProjectPanel.jsx";
 import { useStage } from "./domains/stage.js";
 import LightPanel from "./panels/LightPanel.jsx";
 import EnvironmentPanel from "./panels/EnvironmentPanel.jsx";
+import ProductionPanel from "./panels/ProductionPanel.jsx";
+import { useProduction } from "./domains/production.js";
 
 import {
 	useCallback,
@@ -1528,6 +1530,9 @@ export default function App() {
 		renameSceneDocumentFromUi, deleteSceneDocumentFromUi, switchSceneDocument, addSceneDocument,
 		duplicateSceneDocument, renameSceneDocument, deleteSceneDocument,
 	} = scenesDomain;
+
+	const productionDomain = useProduction(appContext);
+	const [productionPanelOpen, setProductionPanelOpen] = useState(false);
 
 	const saveBlockedRef = useRef(startup.saveBlocked);
 	const dirtyRef = useRef(false);
@@ -4542,35 +4547,12 @@ export default function App() {
 		return executeExportRequest(frameJob.request);
 	}
 
-	// Keep the optional sidecar live instead of freezing its startup state.
-	// Developers commonly open the studio first and start `npm run bridge`
-	// second; a one-shot failed probe left Generate disabled until reload.
+	// Motion sidecar disabled (Ardy retired in favor of native 3D studio workflow).
 	useEffect(() => {
-		let alive = true;
-		let inflight = null;
-		// The poll answer is almost always identical to the last one; keeping the
-		// previous object identity skips a full App re-render per poll. Each of
-		// those renders costs ~80ms of main thread on this tree, which read as a
-		// periodic hitch while orbiting/flying the camera.
-		const refreshBridge = () => {
-			if (inflight) return inflight;
-			inflight = checkBridge().then((state) => {
-				if (!alive) return;
-				if (state.ok) trackFeature("mcp_connected");
-				setBridge((previous) => JSON.stringify(previous) === JSON.stringify(state) ? previous : state);
-				setLineEditBackend(hasLineEditCapability(state));
-			}).finally(() => { inflight = null; });
-			return inflight;
-		};
-		bridgeRefreshRef.current = refreshBridge;
-		refreshBridge();
-		const id = window.setInterval(refreshBridge, BRIDGE_RECHECK_MS);
-		window.addEventListener("focus", refreshBridge);
-		return () => {
-			alive = false;
-			window.clearInterval(id);
-			window.removeEventListener("focus", refreshBridge);
-		};
+		const disabledState = { ok: false, disabled: true, reason: "bridge disabled" };
+		setBridge(disabledState);
+		setLineEditBackend(false);
+		bridgeRefreshRef.current = () => Promise.resolve(disabledState);
 	}, []);
 
 	// QA/programmatic requests must use the current render's same generation path.
@@ -6517,6 +6499,8 @@ export default function App() {
 		emitCommandEvent: detail => window.dispatchEvent(new CustomEvent("cozyclay:command", { detail })),
 	});
 	appContext.updateActionPorts({
+		// Production installs must use the native bus, including transactions and job contexts.
+		bus: { run: (id, args) => appContext.bus.run(id, args, { origin: "ui" }) },
 		// Shots and objects come from the synchronously published read model, so
 		// an action sees its own edit before React renders it.
 		state: () => ({
@@ -6769,12 +6753,27 @@ export default function App() {
 							{ko("Live workspace", "라이브 작업공간")} {liveWorkspaceHandle}
 						</span>
 					)}
+					<button
+						type="button"
+						className={"topbar-action production-topbar-action" + (productionPanelOpen ? " active" : "")}
+						data-testid="topbar-production"
+						title={ko("Distant production story workflow", "원격 프로덕션 스토리 워크플로우")}
+						onClick={() => setProductionPanelOpen((v) => !v)}
+					>
+						{ko("Production", "프로덕션")}
+					</button>
 					<SettingsMenu
 						motionSetupReveal={motionSetupReveal}
 						motionSetup={<MotionSetup state={motionSetupKind === "trail" ? trailReadinessState : motionSetupKind === "line" ? lineReadinessState : readinessState} checking={bridgeChecking} onRetry={recheckMotionHealth} />}
 					/>
 				</div>
 			</header>
+
+			<ProductionPanel
+				isOpen={productionPanelOpen}
+				onClose={() => setProductionPanelOpen(false)}
+				productionDomain={productionDomain}
+			/>
 
 			<div className="main" style={workspaceStyle}>
 			<div className="workspace">
