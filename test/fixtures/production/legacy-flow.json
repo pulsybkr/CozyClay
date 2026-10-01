@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "cozy-story-v1",
+  "projectId": "LEGACY_FLOW_01",
+  "revision": "r01",
+  "title": "Projet Flow Ancien Format",
+  "sourceMode": "legacy",
+  "project": {
+    "fps": 24,
+    "aspect": "9:16",
+    "durationSeconds": 8
+  },
+  "characters": [
+    {
+      "id": "CHAR_HERO",
+      "name": "Héros",
+      "appearance": "Silhouette athlétique, veste en cuir.",
+      "avatar": { "strategy": "builtin", "referenceResourceId": null }
+    }
+  ],
+  "sets": [
+    {
+      "id": "ENV_STREET",
+      "name": "Rue de nuit",
+      "description": "Rue pluvieuse éclairée par un lampadaire.",
+      "structure": [],
+      "props": []
+    }
+  ],
+  "scenes": [
+    {
+      "id": "SCENE_01",
+      "setId": "ENV_STREET",
+      "globalStartSeconds": 0,
+      "globalEndSeconds": 8,
+      "cast": [
+        { "characterId": "CHAR_HERO", "positionMeters": { "x": 0, "y": 0, "z": 0 }, "yawDegrees": 0 }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "SHOT_FLOW_01",
+      "sceneId": "SCENE_01",
+      "startSeconds": 0,
+      "endSeconds": 8,
+      "camera": {
+        "size": "medium",
+        "angle": "eye-level",
+        "move": { "kind": "static" },
+        "targets": ["CHAR_HERO"]
+      },
+      "legacy": {
+        "imagePrompt": "Cinematic street night photo of hero standing under lamp",
+        "videoPrompt": "Hero looks around calmly under the rain, slow camera drift",
+        "needsAdaptation": true
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "ACT_STAND",
+      "kind": "body",
+      "sceneId": "SCENE_01",
+      "characterId": "CHAR_HERO",
+      "startSeconds": 0,
+      "endSeconds": 8,
+      "description": "Le héros attend sous la pluie."
+    }
+  ],
+  "narration": [],
+  "resources": [],
+  "extensions": {
+    "legacyFlow": {
+      "promptModel": "flux-schnell",
+      "originalStyle": "cinematic"
+    }
+  }
+}

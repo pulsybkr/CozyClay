@@ -1,0 +1,240 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CozyStory Studio 3D Export API",
+    "version": "1.0.0",
+    "description": "API d'export et consultation de snapshots narratifs pour l'intégration CozyClay VRM Studio."
+  },
+  "servers": [
+    { "url": "/api/studio/v1", "description": "Base route d'API Studio 3D" }
+  ],
+  "security": [
+    { "BearerAuth": [] }
+  ],
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "summary": "Obtenir les capacités et sections supportées par le serveur distant",
+        "operationId": "getCapabilities",
+        "responses": {
+          "200": {
+            "description": "Capacités retournées avec succès",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CapabilitiesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/manifest": {
+      "get": {
+        "summary": "Récupérer le manifest de la dernière révision disponible",
+        "operationId": "getLatestManifest",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Manifest courant",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Manifest" } }
+            }
+          },
+          "404": { "description": "Projet non trouvé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/revisions/{revision}/manifest": {
+      "get": {
+        "summary": "Récupérer le manifest d'une révision figée",
+        "operationId": "getRevisionManifest",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" } },
+          { "name": "revision", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Manifest de la révision",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Manifest" } }
+            }
+          },
+          "404": { "description": "Révision ou projet non trouvé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "410": { "description": "Révision expirée", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/revisions/{revision}/sections/{section}": {
+      "get": {
+        "summary": "Récupérer une page paginée d'une section figée",
+        "operationId": "getSectionPage",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "revision", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "section", "in": "path", "required": true, "schema": { "type": "string", "enum": ["characters", "sets", "scenes", "shots", "actions", "narration"] } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 50, "maximum": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page de section",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SectionPage" } }
+            }
+          },
+          "409": { "description": "Curseur invalide ou périmé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/revisions/{revision}/snapshot": {
+      "get": {
+        "summary": "Récupérer le snapshot complet borné",
+        "operationId": "getSnapshot",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "revision", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot complet",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Snapshot" } }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/revisions/{revision}/resources/{resourceId}": {
+      "get": {
+        "summary": "Télécharger une ressource binaire autorisée",
+        "operationId": "getResource",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "revision", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flux binaire de la ressource",
+            "content": {
+              "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Jeton de consultation en lecture seule"
+      }
+    },
+    "schemas": {
+      "CapabilitiesResponse": {
+        "type": "object",
+        "required": ["schemaVersion", "supportedSections", "maxLimit"],
+        "properties": {
+          "schemaVersion": { "type": "string", "example": "cozy-story-v1" },
+          "supportedSections": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "maxLimit": { "type": "integer", "example": 100 }
+        }
+      },
+      "Manifest": {
+        "type": "object",
+        "required": ["schemaVersion", "projectId", "revision", "title", "project", "sections"],
+        "properties": {
+          "schemaVersion": { "type": "string", "example": "cozy-story-v1" },
+          "projectId": { "type": "string" },
+          "revision": { "type": "string" },
+          "manifestHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "title": { "type": "string" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "sourceMode": { "type": "string", "enum": ["structured", "legacy", "mixed"] },
+          "project": {
+            "type": "object",
+            "required": ["fps", "aspect", "durationSeconds"],
+            "properties": {
+              "fps": { "type": "integer" },
+              "aspect": { "type": "string", "enum": ["9:16", "16:9"] },
+              "durationSeconds": { "type": "number" }
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "count", "ids", "hash"],
+              "properties": {
+                "name": { "type": "string" },
+                "count": { "type": "integer" },
+                "ids": { "type": "array", "items": { "type": "string" } },
+                "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+              }
+            }
+          },
+          "resources": { "type": "array", "items": { "type": "object" } },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "SectionPage": {
+        "type": "object",
+        "required": ["schemaVersion", "projectId", "revision", "section", "items", "total"],
+        "properties": {
+          "schemaVersion": { "type": "string" },
+          "projectId": { "type": "string" },
+          "revision": { "type": "string" },
+          "section": { "type": "string" },
+          "sectionHash": { "type": "string" },
+          "items": { "type": "array", "items": { "type": "object" } },
+          "nextCursor": { "type": ["string", "null"] },
+          "total": { "type": "integer" }
+        }
+      },
+      "Snapshot": {
+        "type": "object",
+        "required": ["schemaVersion", "projectId", "revision", "title", "project", "characters", "sets", "scenes", "shots", "actions"],
+        "properties": {
+          "schemaVersion": { "type": "string", "example": "cozy-story-v1" },
+          "projectId": { "type": "string" },
+          "revision": { "type": "string" },
+          "title": { "type": "string" },
+          "sourceMode": { "type": "string", "enum": ["structured", "legacy", "mixed"] },
+          "project": { "type": "object" },
+          "characters": { "type": "array", "items": { "type": "object" } },
+          "sets": { "type": "array", "items": { "type": "object" } },
+          "scenes": { "type": "array", "items": { "type": "object" } },
+          "shots": { "type": "array", "items": { "type": "object" } },
+          "actions": { "type": "array", "items": { "type": "object" } },
+          "expressions": { "type": "array", "items": { "type": "object" } },
+          "narration": { "type": "array", "items": { "type": "object" } },
+          "resources": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "retryable"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "retryable": { "type": "boolean" },
+              "details": { "type": "array", "items": { "type": "object" } }
+            }
+          },
+          "requestId": { "type": "string" }
+        }
+      }
+    }
+  }
+}

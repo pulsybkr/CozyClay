@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "cozy-story-v1",
+  "projectId": "LEGACY_AGNES_02",
+  "revision": "r03",
+  "title": "Projet Agnès Multi-Plans",
+  "sourceMode": "mixed",
+  "project": {
+    "fps": 24,
+    "aspect": "9:16",
+    "durationSeconds": 6
+  },
+  "characters": [
+    {
+      "id": "CHAR_AGNES",
+      "name": "Agnès",
+      "appearance": "Cheveux roux bouclés, manteau d'hiver jaune.",
+      "heightMeters": 1.65,
+      "avatar": { "strategy": "builtin", "referenceResourceId": null }
+    }
+  ],
+  "sets": [
+    {
+      "id": "ENV_GARDEN",
+      "name": "Jardin enneigé",
+      "description": "Jardin d'hiver avec arbres nus.",
+      "structure": [],
+      "props": []
+    }
+  ],
+  "scenes": [
+    {
+      "id": "SCENE_01",
+      "setId": "ENV_GARDEN",
+      "globalStartSeconds": 0,
+      "globalEndSeconds": 6,
+      "cast": [
+        { "characterId": "CHAR_AGNES", "positionMeters": { "x": 0, "y": 0, "z": 0 }, "yawDegrees": 0 }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "SHOT_AGNES_01",
+      "sceneId": "SCENE_01",
+      "startSeconds": 0,
+      "endSeconds": 3,
+      "camera": {
+        "size": "wide",
+        "angle": "eye-level",
+        "move": { "kind": "static" },
+        "targets": ["CHAR_AGNES"]
+      },
+      "legacy": {
+        "imagePrompt": "Winter garden with young woman in yellow coat, snowy ground",
+        "videoPrompt": "Agnes walking forward slowly in the snow",
+        "needsAdaptation": true
+      }
+    },
+    {
+      "id": "SHOT_AGNES_02",
+      "sceneId": "SCENE_01",
+      "startSeconds": 3,
+      "endSeconds": 6,
+      "camera": {
+        "size": "close",
+        "angle": "eye-level",
+        "move": { "kind": "push-in", "distanceMeters": 0.2 },
+        "targets": ["CHAR_AGNES"]
+      },
+      "legacy": {
+        "imagePrompt": "Close up on Agnes smiling softly, snow flakes falling",
+        "videoPrompt": "Gentle smile, breathing out cold air",
+        "needsAdaptation": false
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "ACT_WALK",
+      "kind": "body",
+      "sceneId": "SCENE_01",
+      "characterId": "CHAR_AGNES",
+      "startSeconds": 0,
+      "endSeconds": 3,
+      "description": "Agnès marche dans la neige."
+    },
+    {
+      "id": "ACT_SMILE",
+      "kind": "expression",
+      "sceneId": "SCENE_01",
+      "characterId": "CHAR_AGNES",
+      "intent": "smile",
+      "binding": { "kind": "scene" },
+      "keys": [
+        { "timeSeconds": 3, "weight": 0 },
+        { "timeSeconds": 4, "weight": 0.8 },
+        { "timeSeconds": 6, "weight": 0.5 }
+      ]
+    }
+  ],
+  "narration": [
+    {
+      "id": "NARR_AGNES_1",
+      "sceneId": "SCENE_01",
+      "startSeconds": 0.5,
+      "endSeconds": 5.5,
+      "text": "L'hiver était enfin arrivé sur la colline."
+    }
+  ],
+  "resources": [],
+  "extensions": {
+    "legacyAgnes": {
+      "keyframeShots": [
+        { "order": 1, "character_ids": ["CHAR_AGNES"], "action": "walking" },
+        { "order": 2, "character_ids": ["CHAR_AGNES"], "action": "smiling" }
+      ]
+    }
+  }
+}

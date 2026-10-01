@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "cozy-story-v1",
+  "projectId": "INVALID_PROJ",
+  "revision": "r99",
+  "title": "Projet Invalide pour Tests d'Erreur",
+  "project": {
+    "fps": 24,
+    "aspect": "9:16",
+    "durationSeconds": 10
+  },
+  "characters": [
+    { "id": "CHAR_VALID", "name": "Solo", "avatar": { "strategy": "builtin", "referenceResourceId": null } }
+  ],
+  "sets": [
+    { "id": "ENV_A", "name": "Piece A", "description": "Test set", "structure": [], "props": [] }
+  ],
+  "scenes": [
+    {
+      "id": "SCENE_01",
+      "setId": "ENV_NONEXISTENT",
+      "globalStartSeconds": 0,
+      "globalEndSeconds": 10,
+      "cast": [
+        { "characterId": "CHAR_UNKNOWN_GHOST", "positionMeters": { "x": 0, "y": 0, "z": 0 }, "yawDegrees": 0 }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "SHOT_01",
+      "sceneId": "SCENE_01",
+      "startSeconds": 0,
+      "endSeconds": 4,
+      "camera": {
+        "size": "medium",
+        "angle": "eye-level",
+        "move": { "kind": "static" },
+        "targets": ["CHAR_GHOST"]
+      }
+    },
+    {
+      "id": "SHOT_02",
+      "sceneId": "SCENE_01",
+      "startSeconds": 6,
+      "endSeconds": 10,
+      "camera": {
+        "size": "close",
+        "angle": "eye-level",
+        "move": { "kind": "static" },
+        "targets": ["CHAR_VALID"]
+      }
+    }
+  ],
+  "actions": [],
+  "narration": [],
+  "resources": []
+}

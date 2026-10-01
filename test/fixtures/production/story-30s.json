@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "cozy-story-v1",
+  "projectId": "PROJ_STORY_30S",
+  "revision": "r01",
+  "title": "La réunion dans le couloir",
+  "sourceMode": "structured",
+  "project": {
+    "fps": 24,
+    "aspect": "16:9",
+    "durationSeconds": 30
+  },
+  "characters": [
+    {
+      "id": "CHAR_A",
+      "name": "Alex",
+      "appearance": "Cheveux bruns, sweat bleu.",
+      "heightMeters": 1.78,
+      "avatar": { "strategy": "builtin", "referenceResourceId": null }
+    },
+    {
+      "id": "CHAR_B",
+      "name": "Marie",
+      "appearance": "Cheveux noirs, veste verte.",
+      "heightMeters": 1.7,
+      "avatar": { "strategy": "builtin", "referenceResourceId": null }
+    }
+  ],
+  "sets": [
+    {
+      "id": "ENV_OFFICE",
+      "name": "Bureau",
+      "description": "Bureau ouvert avec table de travail.",
+      "structure": [
+        { "id": "WALL_1", "shape": "box", "dimensionsMeters": { "x": 6, "y": 3, "z": 0.1 }, "positionMeters": { "x": 0, "y": 0, "z": -3 }, "yawDegrees": 0, "color": "#e0e0e0" }
+      ],
+      "props": [
+        { "id": "TABLE", "name": "Table", "acquisition": { "strategy": "library", "query": "wooden table" }, "heightMeters": 0.8, "positionMeters": { "x": 0, "y": 0, "z": 0 }, "yawDegrees": 0 }
+      ],
+      "lighting": { "keyIntensity": 1.0, "ambientIntensity": 0.4 }
+    },
+    {
+      "id": "ENV_CORRIDOR",
+      "name": "Couloir",
+      "description": "Couloir vitré menant aux salles.",
+      "structure": [
+        { "id": "WALL_CORR_L", "shape": "box", "dimensionsMeters": { "x": 10, "y": 3, "z": 0.1 }, "positionMeters": { "x": -1.5, "y": 0, "z": 0 }, "yawDegrees": 90, "color": "#f5f5f5" },
+        { "id": "WALL_CORR_R", "shape": "box", "dimensionsMeters": { "x": 10, "y": 3, "z": 0.1 }, "positionMeters": { "x": 1.5, "y": 0, "z": 0 }, "yawDegrees": 90, "color": "#f5f5f5" }
+      ],
+      "props": [
+        { "id": "BENCH", "name": "Banc", "acquisition": { "strategy": "library", "query": "corridor bench" }, "heightMeters": 0.45, "positionMeters": { "x": -1.1, "y": 0, "z": 2 }, "yawDegrees": 90 }
+      ],
+      "lighting": { "keyIntensity": 1.1, "ambientIntensity": 0.6 }
+    }
+  ],
+  "scenes": [
+    {
+      "id": "SCENE_01",
+      "setId": "ENV_OFFICE",
+      "globalStartSeconds": 0,
+      "globalEndSeconds": 10,
+      "cast": [
+        { "characterId": "CHAR_A", "positionMeters": { "x": -0.8, "y": 0, "z": 0.5 }, "yawDegrees": 0 },
+        { "characterId": "CHAR_B", "positionMeters": { "x": 0.8, "y": 0, "z": 0.5 }, "yawDegrees": 180 }
+      ]
+    },
+    {
+      "id": "SCENE_02",
+      "setId": "ENV_CORRIDOR",
+      "globalStartSeconds": 10,
+      "globalEndSeconds": 20,
+      "cast": [
+        { "characterId": "CHAR_A", "positionMeters": { "x": 0, "y": 0, "z": -3 }, "yawDegrees": 0 },
+        { "characterId": "CHAR_B", "positionMeters": { "x": 0, "y": 0, "z": 0 }, "yawDegrees": 180 }
+      ]
+    },
+    {
+      "id": "SCENE_03",
+      "setId": "ENV_OFFICE",
+      "globalStartSeconds": 20,
+      "globalEndSeconds": 30,
+      "cast": [
+        { "characterId": "CHAR_A", "positionMeters": { "x": 0, "y": 0, "z": -1 }, "yawDegrees": 0 },
+        { "characterId": "CHAR_B", "positionMeters": { "x": 0.5, "y": 0, "z": 0 }, "yawDegrees": -90 }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "SHOT_01",
+      "sceneId": "SCENE_01",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "camera": { "size": "wide", "angle": "eye-level", "move": { "kind": "static" }, "targets": ["CHAR_A", "CHAR_B"] }
+    },
+    {
+      "id": "SHOT_02",
+      "sceneId": "SCENE_02",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "camera": { "size": "medium", "angle": "eye-level", "move": { "kind": "push-in", "distanceMeters": 0.5 }, "targets": ["CHAR_A"] }
+    },
+    {
+      "id": "SHOT_03",
+      "sceneId": "SCENE_03",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "camera": { "size": "medium", "angle": "eye-level", "move": { "kind": "static" }, "targets": ["CHAR_A", "CHAR_B"] }
+    }
+  ],
+  "actions": [
+    {
+      "id": "ACT_TALK_1",
+      "kind": "body",
+      "sceneId": "SCENE_01",
+      "characterId": "CHAR_A",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "description": "Alex parle à Marie."
+    },
+    {
+      "id": "ACT_WALK_CORR",
+      "kind": "body",
+      "sceneId": "SCENE_02",
+      "characterId": "CHAR_A",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "description": "Alex avance dans le couloir.",
+      "trajectory": [
+        { "timeSeconds": 0, "positionMeters": { "x": 0, "y": 0, "z": -3 } },
+        { "timeSeconds": 9.5, "positionMeters": { "x": 0, "y": 0, "z": -0.5 } }
+      ]
+    },
+    {
+      "id": "ACT_SIT_RETURN",
+      "kind": "body",
+      "sceneId": "SCENE_03",
+      "characterId": "CHAR_B",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "description": "Marie prend place au bureau."
+    }
+  ],
+  "expressions": [],
+  "narration": [
+    {
+      "id": "NARR_01",
+      "sceneId": "SCENE_01",
+      "startSeconds": 1,
+      "endSeconds": 8,
+      "text": "Ils convinrent de se retrouver immédiatement pour examiner le dossier."
+    }
+  ],
+  "resources": [],
+  "extensions": {}
+}
