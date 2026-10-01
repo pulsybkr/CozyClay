@@ -52,6 +52,9 @@ import { ko, isKo } from "./locale.js";
 import { isPlaygroundEmbed, takePlaygroundProject } from "./playground.js";
 import { applyPartColours } from "./part-colours.js";
 import { POSE_BONES, applyHipsOffset, applyPose, primeBindPose, normalizeBoneName } from "./poses.js";
+// Which node carries a carried prop's frame. Pure, so the rule that has to work
+// on both an FBX bot and a VRM avatar is testable without a renderer.
+import { findAttachBone } from "./attach-bone.js";
 import { FK_TRACKS, IK_TRACKS, MID_TRACKS } from "./ardy/ik.js";
 import { RENDER_ACTIVITY_EVENT } from "./use-render-activity.js";
 import { CUSTOM_MOVE, SHOT_ASPECT_RATIOS, SUBJECT_HEIGHT_M } from "./shot.js";
@@ -159,22 +162,38 @@ export const placeQuat = new THREE.Quaternion();
 export const placeScale = new THREE.Vector3();
 export const placeEuler = new THREE.Euler();
 
-/** The bone a rig offers under `mixamoName`, by the project's matching rule
+/**
+ * The bone a rig offers under `mixamoName`, by the project's matching rule
  * (normalised names equal, or one a suffix of the other; first depth-first
  * match wins — poses.js and ardy/playback.js agree). Cached per rig: this is
- * asked once per attached prop per rendered frame. */
+ * asked once per attached prop per rendered frame.
+ *
+ * The vocabulary is the SAME one IK resolves against, and that is the fix for
+ * a real defect: a shipped VRM avatar names its joints `J_Bip_R_Hand`, not
+ * `mixamorigRightHand`, so the bare name rule returned null for every hand,
+ * elbow, knee and foot frame. A prop attached to "rightHand" on Sakura or
+ * CHAR 02 therefore rendered as if detached — carrying a cup was impossible on
+ * exactly the avatars this studio ships. `vrm-runtime.js` already tags those
+ * joints with `studioBoneName`, and `ardy/ik.js` (`findBone`) is the proven
+ * reader of that tag, so this consults the same fields instead of the node
+ * name alone.
+ *
+ * `isPoseBone` lets three-vrm's normalized Object3D joints through, which
+ * `node.isBone` alone would skip; on a VRM the normalized joints are the ones
+ * playback actually animates, so they are the frame a prop should ride. Raw
+ * bones stay accepted, which is what keeps the FBX bots working unchanged.
+ */
 export const attachBoneCache = new WeakMap();
 export function attachBoneOf(rig, mixamoName) {
 	let byName = attachBoneCache.get(rig);
 	if (!byName) attachBoneCache.set(rig, (byName = new Map()));
 	if (byName.has(mixamoName)) return byName.get(mixamoName);
-	const target = normalizeBoneName(mixamoName);
-	let found = null;
-	rig.traverse((node) => {
-		if (found || !node.isBone) return;
-		const norm = normalizeBoneName(node.name);
-		if (norm === target || norm.endsWith(target)) found = node;
-	});
+	// The decision itself is pure and lives in attach-bone.js, so the rule that
+	// must hold on both an FBX bot and a VRM avatar is unit-tested without a
+	// renderer. This collects the nodes in traversal order and delegates.
+	const nodes = [];
+	rig.traverse((node) => { nodes.push(node); });
+	const found = findAttachBone(nodes, mixamoName, { isVrm: rig?.userData?.characterFormat === "vrm" });
 	byName.set(mixamoName, found);
 	return found;
 }

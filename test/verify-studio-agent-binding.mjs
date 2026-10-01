@@ -2,6 +2,7 @@
 import * as facialRuntime from "../src/vrm-runtime.js";
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { findAttachBone } from '../src/attach-bone.js';
 import { parseSync } from 'rolldown/experimental';
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -67,7 +68,7 @@ const carried = (() => {
  const source = readFileSync(new URL('../src/app-stage.jsx', import.meta.url), 'utf8');
  const start = source.indexOf('export const ATTACH_BONE_ROWS'), end = source.indexOf('export const CAMERA_MOVE_LABELS_KO');
  assert(start > 0 && end > start, 'app-stage.jsx attachment block');
- return new Function('THREE', 'SCENE_ATTACH_BONES', 'TRAIL_EFFECTOR_JOINTS', 'normalizeBoneName', `${source.slice(start, end).replace(/^export /gm, '')}\nreturn { attachFrameMatrix, sceneObjectMatrix, attachPlacementPatch, placeSceneObject, attachWorldMatrix };`)(THREE, objects.SCENE_ATTACH_BONES, TRAIL_EFFECTOR_JOINTS, normalizeBoneName);
+ return new Function('THREE', 'SCENE_ATTACH_BONES', 'TRAIL_EFFECTOR_JOINTS', 'normalizeBoneName', 'findAttachBone', `${source.slice(start, end).replace(/^export /gm, '')}\nreturn { attachFrameMatrix, sceneObjectMatrix, attachPlacementPatch, placeSceneObject, attachWorldMatrix };`)(THREE, objects.SCENE_ATTACH_BONES, TRAIL_EFFECTOR_JOINTS, normalizeBoneName, findAttachBone);
 })();
 function bounded(promise) {
  let timer;
