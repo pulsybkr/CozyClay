@@ -45,6 +45,7 @@ const NODE_FILES = [
   "test/verify-production-recovery.mjs",
   "test/verify-production-regressions.mjs",
   "test/verify-production-agent-pilot.mjs",
+  "test/verify-production-session.mjs",
   "test/verify-vrm-generation.mjs",
 	"test/verify-scene-cameras.mjs",
 	"test/bus/verify-scene-camera-commands.mjs",

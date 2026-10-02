@@ -164,3 +164,31 @@ vérifient ces identités et la reprise avec un historique neuf sans régénére
 avatars. Les 29 tests ciblés pilote/régressions/commandes passent, ainsi que le
 build. Aucune reprise réelle de génération n’a été lancée ici. Une phase seule
 peut encore atteindre la limite du modèle si ses opérations sont trop nombreuses.
+
+## État Production après rechargement
+
+La restauration utilisait `appContext.shared.startup`, alors que Production
+reçoit le contexte de base, sans `shared`. Elle lit maintenant le propriétaire
+des scènes monté par App. Un abonnement aux modifications des scènes maintient
+l’association de la session quand une scène est ajoutée sans autre modification
+de Production. Les anciens bindings du pilote avec `inputHash` sont récupérés
+avec le champ de contrat `installedInputHash`, également corrigé à l’écriture.
+
+Les étapes et runs en cours sont restaurés comme interrompus ou à vérifier,
+avec conservation des identifiants de jobs. Les étapes vérifiées, avatars,
+artifacts, source, plan et liaisons sont conservés. Le panneau retrouve son état
+ouvert et le choix de modèle/raisonnement compatible avec le catalogue actuel.
+La reprise exige une action utilisateur; les consignes imposent l’inspection des
+installations et jobs existants avant une nouvelle soumission.
+
+43 tests ciblés passent (session, pilote, régressions, projet et commandes),
+ainsi que le build. Le scénario intégré reconstruit le domaine après sauvegarde
+avec le même état natif, puis vérifie la reprise à la phase interrompue sans
+recréer scènes, avatars ni layout/caméras terminés. Les tests utilisent un
+transport simulé : aucun appel GPU ou fournisseur IA. Le rechargement dans le
+navigateur réel du projet utilisateur n’a pas été vérifié ici.
+
+La suite générale `node tools/run-tests.mjs` a également été lancée. Elle échoue
+sur `mcp/verify-import-mesh.mjs` : ce test copie un fixture directement dans
+`C:\Users\pulsy`, hors des répertoires autorisés (`EPERM`). La suite générale
+n’est donc pas annoncée réussie. Le contrôle `git diff --check` passe.

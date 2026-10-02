@@ -31,6 +31,29 @@ export function createDefaultProductionDocument() {
 	};
 }
 
+export function restoreInterruptedProduction(document) {
+ const restored=structuredClone(document);
+ // Older pilot checkpoints used inputHash for cast/prop bindings.
+ for(const binding of Object.values(restored.bindings || {})) {
+  if(binding && !binding.installedInputHash && typeof binding.inputHash==='string')binding.installedInputHash=binding.inputHash;
+ }
+ const pilot=restored.agentExecution;
+ if(pilot){
+  const interrupted=pilot.status==='running' || Object.values(pilot.steps || {}).some(step=>step.status==='running');
+  if(interrupted){
+   pilot.status='interrupted';
+   pilot.error='Pilotage interrompu par le rechargement. Reprendre depuis les éléments déjà installés.';
+   pilot.steps=Object.fromEntries(Object.entries(pilot.steps || {}).map(([id,step])=>[id,step.status==='running'?{...step,status:'interrupted',error:pilot.error}:step]));
+  }
+ }
+ const checkpoint=restored.executionCheckpoint;
+ if(checkpoint){
+  checkpoint.units=(checkpoint.units || []).map(unit=>['running','waiting-provider','artifact-ready','installing'].includes(unit.state)?{...unit,state:'uncertain',errorCode:'RELOAD_INTERRUPTED',message:'Exécution interrompue; vérifier les éléments et jobs existants avant de reprendre.'}:unit);
+  if(checkpoint.runs)checkpoint.runs=checkpoint.runs.map(run=>run.status==='active'?{...run,status:'paused'}:run);
+ }
+ return restored;
+}
+
 /**
  * Creates the production domain owner for CozyClay.
  * Stays mounted at project-level across scene switches.
@@ -38,15 +61,20 @@ export function createDefaultProductionDocument() {
 export function createProductionDomain(appContext) {
 	let initialDoc = createDefaultProductionDocument();
  const sessionKey = "cozyclay-production-session-v1";
+ const scenesOwner=appContext.storeDomain('scenes');
  try {
   const cached = JSON.parse(globalThis.localStorage?.getItem(sessionKey) || "null");
-  const sceneIds = (appContext.shared?.startup?.document?.scenes || []).map(s => s.id).sort();
-  if (cached && sceneIds.length && JSON.stringify(cached.sceneIds) === JSON.stringify(sceneIds) && validateProductionDocument(cached.document).valid) initialDoc = cached.document;
+  // App passes the base context here; shared exists only on forRender facades.
+  const sceneIds = (scenesOwner?.read?.() || appContext.shared?.startup?.document?.scenes || []).map(s => s.id).sort();
+  if (cached?.document && sceneIds.length && JSON.stringify(cached.sceneIds) === JSON.stringify(sceneIds)) {
+   const restored=restoreInterruptedProduction(cached.document);
+   if(validateProductionDocument(restored).valid)initialDoc=restored;
+  }
  } catch { /* Corrupt or unavailable session cache: keep an empty production. */ }
 	const documentStore = createDocumentStore({ owned: { production: initialDoc } });
 
 	const read = () => documentStore.read('production');
- const releaseSession = documentStore.subscribe(() => {
+ const saveSession = () => {
   if (!globalThis.localStorage) return;
   const scenes = appContext.storeDomain('scenes')?.read?.();
   if (!scenes?.length) return;
@@ -55,7 +83,9 @@ export function createProductionDomain(appContext) {
   } catch {
    appContext.notify?.("Production session could not be saved locally. Save the project file before closing.");
   }
- });
+ };
+ const releaseSession = documentStore.subscribe(saveSession);
+ const releaseSceneSession = scenesOwner?.documentStore?.subscribe(saveSession);
 	let currentSession = null;
 	let documentEpoch = 0;
 
@@ -244,9 +274,9 @@ export function createProductionDomain(appContext) {
 
 	function loadPortable(portableDoc) {
 		documentEpoch += 1;
-		const nextDoc = portableDoc ? structuredClone(portableDoc) : createDefaultProductionDocument();
+		const nextDoc = portableDoc ? restoreInterruptedProduction(portableDoc) : createDefaultProductionDocument();
 		if (portableDoc) {
-			const valid = validateProductionDocument(portableDoc);
+			const valid = validateProductionDocument(nextDoc);
 			if (!valid.valid) {
 				console.warn("Invalid production document provided to loadPortable:", valid.errors);
 			}
@@ -285,6 +315,7 @@ export function createProductionDomain(appContext) {
 		dispose() {
 			unregister();
 			releaseSession();
+   releaseSceneSession?.();
 			documentStore.dispose();
 		},
 	};

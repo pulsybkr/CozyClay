@@ -66,7 +66,12 @@ export default function ProductionPanel({
   agentTransport.current.models().then(({models,providers})=>{
    if(cancelled)return;
    setPilotModels(models);setPilotProviders(providers);
-   setPilotModel(current=>nextSelectedModel(providers,models,current));
+   const selected=nextSelectedModel(providers,models,pilotModel || productionDomain?.read?.().agentExecution?.model);
+   setPilotModel(selected);
+   setPilotEffort(current=>{
+    const restored=current || productionDomain?.read?.().agentExecution?.effort || '';
+    return effortOptions(models.find(model=>model.id===selected)).includes(restored)?restored:'';
+   });
   }).catch(error=>{if(!cancelled)setPilotActivity('Service agent : '+error.message);});
   return ()=>{cancelled=true;};
  },[isOpen]);
@@ -89,6 +94,9 @@ export default function ProductionPanel({
 	// Production domain sync
 	const productionDoc = productionDomain?.production || productionDomain?.read?.();
  const currentSource = productionDoc?.source;
+ useEffect(()=>{
+  if(productionDoc?.agentExecution?.status==='interrupted')setPilotActivity(productionDoc.agentExecution.error);
+ },[productionDoc?.agentExecution?.status]);
  useEffect(()=>{
   const units=productionDoc?.plan?.units || [];
   setPlan(units.length?units:null);

@@ -61,10 +61,14 @@ test('model prose, stale verification and unverified motion cannot complete a st
 });
 
 function fixture() {
- const domain=createProductionDomain(createAppContext());
+ const editor={activeSceneId:'initial',scenes:[],characters:[],objects:[],shots:[]};
+ const newDomain=()=>{
+  const app=createAppContext();app.registerStoreDomain('scenes',{read:()=>editor.scenes});
+  return createProductionDomain(app);
+ };
+ let domain=newDomain();
  const s=source();domain.setSourceSnapshot(s);
  domain.writePlan(JSON.parse(JSON.stringify(compile(s).plan.plan)));
- const editor={activeSceneId:'initial',scenes:[],characters:[],objects:[],shots:[]};
  const calls=[];
  let failAt=null,stopRequest=null;
  const transport={
@@ -75,7 +79,7 @@ function fixture() {
    if(task.id===failAt){emit({type:'error',message:'provider offline'});return;}
    if(task.phase==='scene'){
     const nativeEntityId='native-'+task.sceneId;editor.activeSceneId=nativeEntityId;editor.scenes.push({id:nativeEntityId});
-    domain.patchBindings({[task.sceneId]:{nativeEntityId}});
+    domain.patchBindings({[task.sceneId]:{sourceId:task.sceneId,nativeSceneId:nativeEntityId,nativeEntityId,nativeKind:'scene',installedInputHash:data.units[0].inputHash}});
    }else if(task.phase==='avatar'){
     emit({type:'tool.done',name:'run_action',ok:true,result:{output:{modelId:'vrm-'+task.characterId,assetId:'asset-'+task.characterId,jobId:'job_'+task.characterId,characterId:'created-'+task.characterId}}});
    }else{
@@ -96,9 +100,33 @@ function fixture() {
   }
  };
  const bus={async run(action,args){assert.equal(action,'scene.switch');assert.ok(args.sceneId);editor.activeSceneId=args.sceneId;return {ok:true};}};
- const pilot=createProductionPilot({domain,bus,transport,readEditor:()=>editor,buildContext:()=>({host:{sceneId:editor.activeSceneId},entities:[{id:'observed',token:editor.contextToken || 'old-token'}]})});
- return {domain,editor,calls,pilot,transport,setFailure:id=>{failAt=id;},get stopRequest(){return stopRequest;}};
+ const newPilot=()=>createProductionPilot({domain,bus,transport,readEditor:()=>editor,buildContext:()=>({host:{sceneId:editor.activeSceneId},entities:[{id:'observed',token:editor.contextToken || 'old-token'}]})});
+ let pilot=newPilot();
+ return {get domain(){return domain;},editor,calls,get pilot(){return pilot;},transport,reload(){domain.dispose();domain=newDomain();pilot=newPilot();},setFailure:id=>{failAt=id;},get stopRequest(){return stopRequest;}};
 }
+
+test('persisted pilot resumes after a page reload without recreating scenes, avatars or finished layout',async()=>{
+ const previous=globalThis.localStorage,cache=new Map();
+ globalThis.localStorage={getItem:key=>cache.get(key)||null,setItem:(key,value)=>cache.set(key,value)};
+ const f=fixture();
+ try{
+  const interrupted=pilotTasks(source()).find(task=>task.phase==='motion').id;
+  f.setFailure(interrupted);await assert.rejects(f.pilot.run({model:'provider/model'}),/provider offline/);
+  f.domain.write(doc=>({...doc,agentExecution:{...doc.agentExecution,status:'running',steps:{...doc.agentExecution.steps,[interrupted]:{status:'running'}}}}));
+  const before=structuredClone(f.domain.read()),callCount=f.calls.length;
+  f.reload();assert.equal(f.domain.read().productionId,before.productionId);
+  assert.deepEqual(f.domain.read().bindings,before.bindings);assert.deepEqual(f.domain.read().artifacts,before.artifacts);
+  assert.equal(f.domain.read().agentExecution.steps[interrupted].status,'interrupted');
+  f.setFailure(null);await f.pilot.run({model:'provider/model'});
+  const resumed=f.calls.slice(callCount);
+  assert.equal(resumed[0].task.id,interrupted);
+  assert.ok(resumed.every(call=>!['scene','avatar'].includes(call.task.phase)));
+  assert.ok(!resumed.some(call=>call.task.id==='layout:S1' || call.task.id==='cameras:S1'));
+  assert.equal(f.domain.read().agentExecution.status,'verified');
+ }finally{
+  f.domain.dispose();if(previous===undefined)delete globalThis.localStorage;else globalThis.localStorage=previous;
+ }
+});
 
 test('HTTP refusal preserves the Studio stale code without changing the UI category',async()=>{
  const event=await refusalEvent(new Response(JSON.stringify({error:{code:'STALE_TARGET',message:'Content changed.'}}),{status:409}));

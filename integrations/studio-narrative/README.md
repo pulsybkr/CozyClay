@@ -121,6 +121,21 @@ si `COZYCLAY_LIVE_PORT` a été fixé explicitement, il respecte ce choix et sig
 un conflit. Après une modification du serveur, redémarrer le processus puis
 actualiser la page avant de reprendre le pilotage.
 
+## Reprendre après un rechargement
+
+La session Production est sauvegardée localement avec le document de scènes :
+source, plan, bindings, ressources, avatars générés, modèle IA et étapes vérifiées.
+Après actualisation, ouvrir Production et cliquer sur **Reprendre le pilotage IA**.
+Une étape en cours apparaît comme interrompue; les étapes terminées sont conservées.
+Le pilote inspecte les éléments et jobs existants avant de continuer, avec une
+nouvelle conversation pour la phase reprise. Aucune génération ne démarre au
+simple rechargement. Les scènes terminées sont revérifiées à la reprise.
+
+La restauration exige le même ensemble d’identifiants de scènes locales pour
+éviter de rattacher la production à un autre projet. La session est également
+incluse dans la sauvegarde portable du projet. Une sauvegarde déjà perdue ne peut
+pas être reconstruite à partir des seuls objets visibles.
+
 ## Tests
 
 ```powershell

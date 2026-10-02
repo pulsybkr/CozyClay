@@ -1532,7 +1532,8 @@ export default function App() {
 	} = scenesDomain;
 
 	const productionDomain = useProduction(appContext);
-	const [productionPanelOpen, setProductionPanelOpen] = useState(false);
+	const [productionPanelOpen, setProductionPanelOpen] = useState(()=>{try{return localStorage.getItem('cozyclay.production.panel.open')==='true';}catch{return false;}});
+ useEffect(()=>{try{localStorage.setItem('cozyclay.production.panel.open',String(productionPanelOpen));}catch{}},[productionPanelOpen]);
 
 	const saveBlockedRef = useRef(startup.saveBlocked);
 	const dirtyRef = useRef(false);
