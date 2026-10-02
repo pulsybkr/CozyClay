@@ -15,6 +15,7 @@ if (!process.env.COZYCLAY_AGENT_SESSIONS_DIR) {
 
 const NODE_FILES = [
   "test/verify-agent-vrm-jobs.mjs",
+  "test/verify-agent-live-start.mjs",
   "test/verify-poly-pizza.mjs",
   "test/verify-poly-pizza-route.mjs",
   "test/verify-library-commands.mjs",
@@ -30,6 +31,7 @@ const NODE_FILES = [
   "test/verify-source-client.mjs",
   "test/verify-source-routes.mjs",
   "test/verify-production-compiler.mjs",
+  "test/verify-production-narrative.mjs",
   "test/verify-production-camera.mjs",
   "test/verify-production-installers.mjs",
   "test/verify-production-run-store.mjs",
@@ -42,6 +44,7 @@ const NODE_FILES = [
   "test/verify-production-interaction.mjs",
   "test/verify-production-recovery.mjs",
   "test/verify-production-regressions.mjs",
+  "test/verify-production-agent-pilot.mjs",
   "test/verify-vrm-generation.mjs",
 	"test/verify-scene-cameras.mjs",
 	"test/bus/verify-scene-camera-commands.mjs",

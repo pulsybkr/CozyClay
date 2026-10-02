@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { ko } from "../locale.js";
 import { useBus } from "../app-context.js";
+import { createProductionPilot, issueText } from "../production/agent-pilot.js";
+import { createAgentTransport, nextSelectedModel, modelIsSelectable, effortOptions, storeModel } from "../workflow/agent-client.js";
 import {
 	listConnections,
 	createConnection,
@@ -14,6 +16,8 @@ export default function ProductionPanel({
 	isOpen,
 	onClose,
 	productionDomain,
+	buildAgentContext,
+	readEditor,
 }) {
 	const bus = useBus();
 	const [connections, setConnections] = useState([]);
@@ -47,10 +51,49 @@ export default function ProductionPanel({
 	const [execError, setExecError] = useState(null);
 	// Grant state: user must explicitly consent before launch
 	const [grantPending, setGrantPending] = useState(false);
+ const [pilotModels, setPilotModels] = useState([]);
+ const [pilotProviders, setPilotProviders] = useState([]);
+ const [pilotModel, setPilotModel] = useState('');
+ const [pilotEffort, setPilotEffort] = useState('');
+ const [pilotBusy, setPilotBusy] = useState(false);
+ const [pilotActivity, setPilotActivity] = useState('');
+ const pilotRef = useRef(null);
+ const agentTransport = useRef(null);
+ if(!agentTransport.current)agentTransport.current=createAgentTransport({surface:'studio'});
+ useEffect(()=>{
+  if(!isOpen)return;
+  let cancelled=false;
+  agentTransport.current.models().then(({models,providers})=>{
+   if(cancelled)return;
+   setPilotModels(models);setPilotProviders(providers);
+   setPilotModel(current=>nextSelectedModel(providers,models,current));
+  }).catch(error=>{if(!cancelled)setPilotActivity('Service agent : '+error.message);});
+  return ()=>{cancelled=true;};
+ },[isOpen]);
+ async function handleAgentPilot() {
+  if(pilotBusy || runBusy)return;
+  setPilotBusy(true);setExecError(null);
+  pilotRef.current=createProductionPilot({domain:productionDomain,bus,transport:agentTransport.current,
+   buildContext:buildAgentContext,readEditor,onEvent:event=>{
+    if(event.type==='step')setPilotActivity(event.task.id);
+    else if(event.type==='refresh')setPilotActivity(event.message);
+    else if(event.type==='tool.start')setPilotActivity(event.name);
+    else if(event.type==='text.delta')setPilotActivity(value=>(value+event.text).slice(-800));
+   }});
+  try {await pilotRef.current.run({model:pilotModel,effort:pilotEffort});setPilotActivity('Production vérifiée.');}
+  catch(error){setExecError('Pilotage IA : '+error.message);}
+  finally{setPilotBusy(false);}
+ }
+ useEffect(()=>()=>{void pilotRef.current?.stop();},[]);
 
 	// Production domain sync
 	const productionDoc = productionDomain?.production || productionDomain?.read?.();
  const currentSource = productionDoc?.source;
+ useEffect(()=>{
+  const units=productionDoc?.plan?.units || [];
+  setPlan(units.length?units:null);
+  setPlanIssues(productionDoc?.plan?.issues || []);
+ },[productionDoc?.plan]);
  async function runProduction(action, args) {
   const receipt = await bus.run(action, args);
   if (receipt?.ok === false) throw new Error(receipt.message || receipt.summary || "Production command failed");
@@ -526,7 +569,7 @@ export default function ProductionPanel({
 							type="button"
 							className="btn-primary"
 							onClick={handleFetchProject}
-							disabled={loading || !selectedConnId || !projectId.trim()}
+							disabled={loading || pilotBusy || runBusy || !selectedConnId || !projectId.trim()}
 						>
 							{loading ? ko("Récupération…", "가져오는 중…") : ko("Récupérer", "가져오기")}
 						</button>
@@ -588,7 +631,7 @@ export default function ProductionPanel({
 								type="button"
 								className="btn-primary btn-block"
 								onClick={handleApplyToProduction}
-								disabled={loading}
+								disabled={loading || pilotBusy || runBusy}
 							>
 								{currentSource?.snapshot?.projectId === snapshot.projectId
 									? ko("Actualiser cette production", "이 프로덕션 업데이트")
@@ -611,7 +654,7 @@ export default function ProductionPanel({
 						type="button"
 						className="btn-primary btn-block"
 						onClick={handlePrepare}
-						disabled={prepareBusy || runBusy || !currentSource}
+						disabled={prepareBusy || runBusy || pilotBusy || !currentSource}
 					>
 						{prepareBusy
 							? ko("Compilation…", "컴파일 중…")
@@ -625,7 +668,7 @@ export default function ProductionPanel({
 							</strong>
 							<ul style={{ margin: "4px 0 0 16px", fontSize: "11px", maxHeight: "80px", overflow: "auto" }}>
 								{planIssues.slice(0, 6).map((issue, i) => (
-									<li key={i}>{issue.message ?? String(issue)}</li>
+									<li key={i}>{issueText(issue)}</li>
 								))}
 							</ul>
 						</div>
@@ -633,6 +676,21 @@ export default function ProductionPanel({
 
 					{plan && plan.length > 0 && (
 						<div style={{ marginTop: "10px" }}>
+       <div className="production-agent-pilot" style={{padding:'10px',border:'1px solid var(--border)',borderRadius:'6px',marginBottom:'10px'}}>
+        <strong>Pilotage IA du Studio</strong>
+        <p style={{fontSize:'12px'}}>L’agent lit chaque scène et réalise les directives : nouveaux VRM Atelier, décor et objets, caméras, prises Kimodo et interactions. Il vérifie chaque étape avant de poursuivre. Les générations utilisent les services configurés du Studio.</p>
+        <label style={{display:'block'}}>Modèle IA <select style={{maxWidth:'100%',display:'block'}} value={pilotModel} disabled={pilotBusy || runBusy} onChange={event=>{setPilotModel(event.target.value);setPilotEffort('');storeModel(event.target.value);}}>
+         <option value="">Choisir un modèle disponible</option>
+         {pilotModels.map(model=><option key={model.id} value={model.id} disabled={!modelIsSelectable(pilotProviders,model.id)}>{model.label || model.id}</option>)}
+        </select></label>
+        {effortOptions(pilotModels.find(model=>model.id===pilotModel)).length>0 && <label> Raisonnement <select value={pilotEffort} disabled={pilotBusy} onChange={event=>setPilotEffort(event.target.value)}><option value="">Par défaut</option>{effortOptions(pilotModels.find(model=>model.id===pilotModel)).map(effort=><option key={effort} value={effort}>{effort}</option>)}</select></label>}
+        <div style={{marginTop:'8px',display:'flex',gap:'6px'}}>
+         <button type="button" className="btn-primary btn-small" disabled={pilotBusy || runBusy || !pilotModel || !buildAgentContext} onClick={handleAgentPilot}>{productionDoc?.agentExecution ? 'Reprendre le pilotage IA' : 'Lancer la réalisation par l’IA'}</button>
+         {pilotBusy && <button type="button" className="btn-secondary btn-small" onClick={()=>void pilotRef.current?.stop().catch(error=>setExecError(error.message))}>Arrêter le pilote</button>}
+        </div>
+        {pilotActivity && <p role="status" style={{fontSize:'12px',whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{pilotActivity}</p>}
+        {Object.entries(productionDoc?.agentExecution?.steps || {}).map(([id,step])=><div key={id} style={{fontSize:'11px'}}>{id} · {step.status}{step.error && <span role="alert"> — {step.error}</span>}</div>)}
+       </div>
 							<div style={{ fontSize: "12px", marginBottom: "6px" }}>
 								<strong>{plan.length}</strong> {ko("unité(s) à exécuter", "실행 단위")}
 								{" · "}
@@ -656,7 +714,7 @@ export default function ProductionPanel({
 								}}>
 									<p style={{ margin: "0 0 8px", fontWeight: "bold" }}>
 										{ko(
-											"Exécuter étape par étape. Les producteurs non configurés sont signalés ; aucun appel GPU automatique.",
+											"Exécution directe sans agent IA (avancé). Ces boutons utilisent les producteurs natifs configurés.",
 											"유료 호출이 실행됩니다. 시작을 확인하세요."
 										)}
 									</p>
@@ -670,7 +728,7 @@ export default function ProductionPanel({
 													type="button"
 													className="btn-primary btn-small"
 													onClick={() => handleGrantAndRunStage(stage)}
-													disabled={runBusy}
+													disabled={runBusy || pilotBusy}
 												>
 													{runBusy ? "…" : `▶ ${stage} (${count})`}
 												</button>
@@ -702,7 +760,7 @@ export default function ProductionPanel({
 										type="button"
 										className="btn-small btn-secondary"
 										onClick={handleResume}
-										disabled={runBusy}
+										disabled={runBusy || pilotBusy}
 									>
 										▶ {ko("Reprendre", "재개")}
 									</button>
@@ -711,6 +769,7 @@ export default function ProductionPanel({
 
 							{Object.keys(unitStatuses).length > 0 && (
 								<div style={{ marginTop: "8px", maxHeight: "140px", overflow: "auto" }}>
+         <small>Historique de l’exécution directe</small>
 									{Object.entries(unitStatuses).map(([unitId, state]) => (
 										<div
 											key={unitId}
@@ -724,7 +783,7 @@ export default function ProductionPanel({
 											<span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{unitId}</span>
 											<span style={{ opacity: 0.7 }}>{state}</span>
 											{state === "failed" && (
-												<button type="button" className="btn-link" style={{ fontSize: "10px" }} onClick={() => handleRetryUnit(unitId)}>↺</button>
+												<button type="button" disabled={pilotBusy || runBusy} className="btn-link" style={{ fontSize: "10px" }} onClick={() => handleRetryUnit(unitId)}>↺</button>
 											)}
 										</div>
 									))}

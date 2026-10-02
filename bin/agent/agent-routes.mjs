@@ -232,11 +232,13 @@ const liveHubOwner = () => process.env.COZYCLAY_LIVE_OWNER
 
 /** Start the optional registry/live dependencies without making signed-out
  * startup depend on an MCP dependency install. Failures remain visible on use. */
-function liveToolsRuntime() {
+function liveToolsRuntime({ port = Number(process.env.COZYCLAY_LIVE_PORT ?? 5184), allowPortFallback = false } = {}) {
 	return Promise.all([import("../../mcp/tool-handlers.mjs"), import("../../mcp/live-hub.mjs")]).then(async ([registry, { startLiveHub }]) => {
 		const owner = liveHubOwner();
 		const token = randomBytes(32).toString("hex");
-		const liveHub = await startLiveHub(Number(process.env.COZYCLAY_LIVE_PORT ?? 5184), { token, owner });
+		let liveHub = await startLiveHub(port, { token, owner });
+		if (!liveHub && allowPortFallback) liveHub = await startLiveHub(0, { token, owner });
+		if (!liveHub) throw Object.assign(new Error(`Live editor port ${port} is already in use. Set COZYCLAY_LIVE_PORT to a free port and restart the full Studio server.`), { code: "EADDRINUSE" });
 		registry.setLiveHub(liveHub);
 		const handlers = registry.createToolHandlers().map((tool) => ({
 			...tool,
@@ -265,10 +267,10 @@ function liveToolsRuntime() {
 	});
 }
 
-export function createAgentHandler({ auth = defaultAuth, codex, models, codexBaseUrl, cliproxyBaseUrl, env, fauxProvider, handlers, liveHub, port, studioRuntime, clock = Date.now, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, sessionStore: injectedSessionStore } = {}) {
+export function createAgentHandler({ auth = defaultAuth, codex, models, codexBaseUrl, cliproxyBaseUrl, env, fauxProvider, handlers, liveHub, livePort, allowLivePortFallback = false, port, studioRuntime, clock = Date.now, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, sessionStore: injectedSessionStore } = {}) {
 	const requestContext = new AsyncLocalStorage();
 	codex ||= defaultClient(auth, requestContext);
-	const runtime = handlers !== undefined || liveHub !== undefined ? Promise.resolve({ handlers: handlers ?? [], liveHub }) : liveToolsRuntime();
+	const runtime = handlers !== undefined || liveHub !== undefined ? Promise.resolve({ handlers: handlers ?? [], liveHub }) : liveToolsRuntime({ port: livePort, allowPortFallback: allowLivePortFallback });
 	const renderGuidance = async (environment) => {
 		try {
 			const { handlers: tools, liveHub: hub } = await runtime;
@@ -410,7 +412,7 @@ export function createAgentHandler({ auth = defaultAuth, codex, models, codexBas
 			await session.modelSession?.abort?.("studio stop", acknowledged ? { quiet: true } : undefined);
 			json(res, 200, { ok: true, status: jobId ? "stopped" : "detached", ...(outcome ? { outcome: { status: outcome.status ?? null, code: outcome.code ?? null, mutated: outcome.mutated ?? null } } : {}) }); return true;
 		}
-		if (!studioRuntime && (!hub?.command || !hub?.workspaceId)) throw new StudioProtocolError("CAPABILITY_MISSING", "Studio execution is not installed.");
+		if (!studioRuntime && (!hub?.command || !hub?.workspaceId)) throw new StudioProtocolError("CAPABILITY_MISSING", hubDeps.error?.code === "EADDRINUSE" ? hubDeps.error.message : hubDeps.error?.code === "ERR_MODULE_NOT_FOUND" ? "Live editor dependencies are missing. Run npm ci --prefix mcp, then restart the full Studio server." : "Studio execution is not installed.");
 		if (!value.context.host.workspaceHandle) throw new StudioProtocolError("LIVE_HUB_UNAVAILABLE", "A connected editor handle is required.");
 		let session = studioSessions.get(value.sessionId);
 		const suppliedOwner = parseCookies(req).studio_owner;
@@ -824,6 +826,14 @@ export function createAgentHandler({ auth = defaultAuth, codex, models, codexBas
 		return true;
 	};
 
+	// The full dev launcher waits for its own hub before configuring the browser.
+	// A foreign process occupying the default port is never adopted as this hub.
+	handle.liveReady = async () => {
+		const dependencies = await runtime;
+		if (dependencies.error) throw dependencies.error;
+		if (!dependencies.liveHub?.command || !dependencies.liveHub?.workspaceId) throw new Error("Studio execution is not installed.");
+		return { port: dependencies.liveHub.port };
+	};
 	handle.close = async () => {
 		unsubscribe?.();
 		for (const session of sessions.values()) session.controller?.abort();

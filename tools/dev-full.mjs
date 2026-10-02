@@ -33,7 +33,7 @@ function mainPortFrom(args) {
 	return port;
 }
 
-const livePort = process.env.COZYCLAY_LIVE_PORT ?? "5184";
+let livePort = process.env.COZYCLAY_LIVE_PORT ?? "5184";
 const configuredOAuthPort = process.env.COZYCLAY_OAUTH_PORT?.trim();
 const mainPort = mainPortFrom(viteArgs);
 
@@ -98,7 +98,18 @@ if (kimodoHost || process.env.CCLAY_KIMODO_API_URL?.trim()) {
 // Resolved once per Studio admission by task 6, not from the historical port.
 const getBridgeOrigin = () => bridge && bridgePort !== undefined && bridge.exitCode === null && bridge.signalCode === null
 	? `http://127.0.0.1:${bridgePort}` : null;
-const agentHandler = createAgentHandler({ port: mainPort, getBridgeOrigin });
+const agentHandler = createAgentHandler({ port: mainPort, getBridgeOrigin, livePort: Number(livePort), allowLivePortFallback: !process.env.COZYCLAY_LIVE_PORT });
+try {
+ const ready = await agentHandler.liveReady();
+ if (String(ready.port) !== livePort) console.log(`[dev] live editor listening on owned port ${ready.port}.`);
+ livePort = String(ready.port);
+} catch (error) {
+ console.error(`[dev] Live editor could not start: ${error.message}`);
+ removeSignalCleanup();
+ await agentHandler.close();
+ await Promise.allSettled(children.map(child => terminateOwned(child)));
+ process.exit(1);
+}
 // The 3D asset library is mounted here rather than inside the agent handler:
 // its API sends no CORS headers, so a search can only be made from this
 // process, where the key lives. Its models come from a CDN that does send
@@ -147,6 +158,7 @@ const first = await Promise.race(
 );
 
 removeSignalCleanup();
+await agentHandler.close();
 await new Promise((resolvePromise) => oauthServer.close(resolvePromise));
 await Promise.allSettled(
 	children.filter((child) => child !== first.child).map((child) => terminateOwned(child)),

@@ -6773,6 +6773,8 @@ export default function App() {
 				isOpen={productionPanelOpen}
 				onClose={() => setProductionPanelOpen(false)}
 				productionDomain={productionDomain}
+				buildAgentContext={buildStudioAgentContext}
+				readEditor={() => studioActionsRef.current.state()}
 			/>
 
 			<div className="main" style={workspaceStyle}>

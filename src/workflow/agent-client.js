@@ -481,6 +481,7 @@ export async function refusalEvent(response) {
 			: `${status ?? "Upstream"} — ${reported}`;
 	return {
 		code: UI_ERROR_CODES.has(detail?.code) ? detail.code : status === 429 ? "rate_limit" : status === 401 ? "auth" : "upstream",
+		...(['STALE_SCENE', 'STALE_TARGET'].includes(detail?.code) ? { refusalCode: detail.code } : {}),
 		message,
 		...(status === null ? {} : { status }),
 		...(detail?.resetAt ? { resetAt: detail.resetAt } : {}),
