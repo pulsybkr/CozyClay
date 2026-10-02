@@ -27,6 +27,26 @@ function nativeBus() {
  } };
 }
 function setup() { const app = createAppContext(); return { app, domain: createProductionDomain(app) }; }
+test("Library installation preserves configuration errors and does not replace missing assets", async () => {
+ const calls = [];
+ const reason = 'Poly Pizza is not configured: set POLY_PIZZA_API_KEY.';
+ const unit = { id:'structure', kind:'structure', inputHash:'h', payload:{sceneId:'S',structure:[],props:[
+  {id:'DESK',name:'Wooden desk',acquisition:{strategy:'library',query:'wooden desk'}}
+ ]}};
+ const bus = {run:async(id,args)=>{
+  calls.push({id,args});
+  if(id==='asset.searchLibrary')return {ok:true,output:{models:[],reason}};
+  return {ok:true,affectedIds:[]};
+ }};
+ await assert.rejects(installSetStructures(unit,{bus,bindings:{S:{nativeEntityId:'scene'}}}),
+  error=>error.message.includes('Wooden desk') && error.message.includes(reason));
+ assert.equal(calls.find(call=>call.id==='asset.searchLibrary').args.limit,8);
+ assert.equal(calls.some(call=>['object.add','object.update','asset.downloadLibraryModel'].includes(call.id)),false);
+ const failed = {run:async(id)=>id==='asset.searchLibrary'
+  ? {ok:false,message:'Receipt exceeds 8 KiB; use a detail cursor.'}
+  : {ok:true,affectedIds:[]}};
+ await assert.rejects(installSetStructures(unit,{bus:failed,bindings:{S:{nativeEntityId:'scene'}}}), /Receipt exceeds 8 KiB/);
+});
 test("Native installation validates real schemas, wall dimensions, actors and moving cameras", async () => {
  const doc = compile(fixture()).plan, bus = nativeBus();
  const scene = await installSceneEnvironment(doc.plan.units.find(u => u.kind === "scene"), { bus });

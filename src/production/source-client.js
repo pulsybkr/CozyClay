@@ -4,7 +4,7 @@
  * cancellation tickets, and detailed error mapping.
  */
 import {
-	SOURCE_SCHEMA_VERSION,
+	SOURCE_SCHEMA_VERSIONS,
 	SOURCE_SECTIONS,
 	SOURCE_LIMITS,
 	validateSectionPage,
@@ -137,7 +137,7 @@ export async function fetchFullSnapshotProgressive(connectionId, projectId, {
 	onProgress({ phase: "manifest", message: "Lecture du manifeste distant..." });
 	const manifest = await fetchManifest(connectionId, projectId, revision, { signal });
 
-	if (manifest.schemaVersion !== SOURCE_SCHEMA_VERSION) {
+	if (!SOURCE_SCHEMA_VERSIONS.includes(manifest.schemaVersion)) {
 		throw new SourceApiError(`Version de schéma non supportée: ${manifest.schemaVersion}`, {
 			code: "SCHEMA_MISMATCH",
 		});
@@ -165,7 +165,7 @@ export async function fetchFullSnapshotProgressive(connectionId, projectId, {
 	// Ordered sections per specification
 	const sectionsOrder = ["characters", "sets", "scenes", "shots", "actions", "narration"];
 	const assembled = {
-		schemaVersion: SOURCE_SCHEMA_VERSION,
+		schemaVersion: manifest.schemaVersion,
 		projectId: manifest.projectId,
 		revision: pinnedRevision,
 		title: manifest.title || `Projet ${manifest.projectId}`,
@@ -238,6 +238,7 @@ export async function fetchValidatedSection(connectionId, projectId, manifest, s
   const page = await fetchSectionPage(connectionId, projectId, manifest.revision, section, { cursor, signal });
   const validation = validateSectionPage(page, section);
   if (!validation.valid) throw new SourceApiError("Invalid section page", { code: "INVALID_PAGE" });
+  if (manifest.schemaVersion && page.schemaVersion !== manifest.schemaVersion) throw new SourceApiError("Section schema mismatch", { code: "SCHEMA_MISMATCH" });
   if (page.projectId !== projectId || page.revision !== manifest.revision) throw new SourceApiError("Section revision mismatch", { code: "REVISION_MISMATCH" });
   if (page.manifestHash && manifest.manifestHash && page.manifestHash !== manifest.manifestHash) throw new SourceApiError("Manifest hash mismatch", { code: "HASH_MISMATCH" });
   if (meta?.count !== undefined && page.total !== meta.count) throw new SourceApiError("Section total mismatch", { code: "COUNT_MISMATCH" });

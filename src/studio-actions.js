@@ -147,7 +147,7 @@ export const STUDIO_ACTIONS = freezeStudioData([
 		description: "Fetch specified sections from the connected source." },
 	{ id: "production.prepare", label: "Prepare production plan", kind: "job",
 		input: input({ productionId: { type: "string" } }, { scopeIds: { type: "array", items: { type: "string" } } }),
-		description: "Compile draft plan and return issues and units without external cost." },
+		description: "Compile and store the full draft plan without external cost; return a compact summary. Read units through production.read." },
 	{ id: "production.adapt", label: "Adapt production story", kind: "job",
 		input: input({ productionId: { type: "string" }, sourceIds: { type: "array", items: { type: "string" } }, expectedPlanRevision: { type: "integer" } }),
 		description: "Propose text adaptation for legacy story assets." },

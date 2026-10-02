@@ -5,6 +5,20 @@ import { sampleAt } from '../../src/sample-at.js';
 import { mountShots } from './shots-hook.mjs';
 
 const ok = receipt => {assert.equal(receipt.ok,true,JSON.stringify(receipt));return receipt;};
+test('production cuts retain their offset into a reusable camera track', () => {
+ const f=shotsFixture();
+ try {
+  ok(f.run('camera.create',{name:'Travelling',cameraId:'travelling',shotId:'shot-a'}));
+  ok(f.run('camera.set',{cameraId:'travelling',set:{interpolation:'linear',cameraKeys:[
+   {frame:0,framing:{pos:{x:0,y:1.6,z:5},yaw:0,pitch:0,fovDeg:40}},
+   {frame:47,framing:{pos:{x:0,y:1.6,z:2},yaw:0,pitch:0,fovDeg:40}},
+  ]}}));
+  ok(f.run('shot.upsert',{shotId:'cut-b',name:'Second cut',startFrame:24,endFrameExclusive:48,cameraId:'travelling',cameraOffsetFrame:24},'agent'));
+  const cut=f.shots.read().find(s=>s.id==='cut-b');
+  assert.equal(cut.cameraOffsetFrame,24);
+  assert.equal(cut.cameraId,'travelling');
+ } finally {f.dispose();}
+});
 test('video export without body motion includes the complete montage unless a shot is requested',async()=>{
   const f=shotsFixture();
   try {

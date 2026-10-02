@@ -1,0 +1,18 @@
+{
+    "app/main.py": "8776660b80884cd7ac3e42be831a90e78e7c98076ac17b1c41b79466f9e53bbc",
+    "app/api/studio_narrative_routes.py": "ab604a7059929f0de38d4971ec31cc4ab8ef8949e217b09f4a4ad12464dc41db",
+    "app/api/studio_routes.py": "4de542e31e9b66a8d897313de18ded229a09f435150ebdae740898cc1a4e23a0",
+    "app/schemas/studio_narrative.py": "f1f823884b56d97cff0d1c9f0a67fa1271b1379bb50c8850a8e1bde0a89cf126",
+    "app/schemas/studio_story.py": "5bd2f07dddacb10b44898fd9ee7ebe97303bca4ef44319246b6c8f5a1f1d4e76",
+    "app/services/studio_audio_duration.py": "0ce56be3f32d5cf8bbec0de34de0bd7a0ed663817669556ed73056c24da8c666",
+    "app/services/studio_narrative_service.py": "7a2cfc8ca7ae71181ef993b2f330bb951d71f7271c24ffe54346c8b30d922940",
+    "app/services/studio_narrative_sources.py": "5fc8cb57b0a42a54ed7876e4d9860aaa7d863df5b7c764d94061aada47fc8130",
+    "app/services/studio_preparation_worker.py": "db3b2da3bca981636f0695dae0241f72d3b622666f6d19a706b168af2caec7b5",
+    "app/services/studio_story_snapshots.py": "23ccab3eda23d105d456256b6341f216a87cc00a6b3b88b1504ce5485ec52316",
+    "app/services/studio_story_validation.py": "a02b813e779b81fd12881363dc20fd32c8c160eaecb33c2ebdc01c13572cba16",
+    "app/static/js/studio-narrative.js": "9a54eecb4c900ba4ef802cac30e27b939c64d14155bc93c1149ad41e7272eba9",
+    "templates/reproduction.html": "34c11813d4f0c0e58c6df3680d61a7f01c2a3e8b6c0b66f7c6f0ab1ef8132333",
+    "templates/studio_narrative.html": "16344d6459299342f744cc0cf1530d2ba22f6605e634ca28c3791d409eaf1e98",
+    "tests/narrative-v2.json": "c2f8677a1d3738e937e2f24cfedf9c5105123c93efb21ef9d829680336f532f5",
+    "tests/test_studio_narrative.py": "d9c094b2a4d3c1025392fa354506cbadcb83c6ad293e73b474d9a1de11da5b6e"
+}

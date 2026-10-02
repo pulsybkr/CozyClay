@@ -104,8 +104,13 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 	const shotUnits = [];
 
 	// Track characters and actions for conflict checks
-	const actions = Array.isArray(snapshot.actions) ? snapshot.actions.filter(a => a.kind !== "expression" && !(a.keys && !a.kind)) : [];
- const expressions = [...(snapshot.expressions || []), ...(snapshot.actions || []).filter(a => a.kind === "expression" || (a.keys && !a.kind))];
+	// V2 facial directives are planned motion, while keyed expressions retain
+	// the existing native expression track path (including all V1 expressions).
+	const isExpressionTrack = action =>
+		(action.kind === "expression" && (snapshot.schemaVersion !== "cozy-story-v2" || action.keys?.length > 0)) ||
+		(action.keys && !action.kind);
+	const actions = Array.isArray(snapshot.actions) ? snapshot.actions.filter(a => !isExpressionTrack(a)) : [];
+ const expressions = [...(snapshot.expressions || []), ...(snapshot.actions || []).filter(isExpressionTrack)];
 	const bodyActionIntervals = new Map(); // key: characterId -> array of { actionId, sceneId, startFrame, endFrameExclusive }
 
 	for (const action of actions) {
@@ -331,7 +336,8 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 			}
 
 			// Plan camera framing
-			const framing = planCameraFraming({
+			const namedCamera = (scene.cameras || []).find(camera => camera.id === shot.cameraId);
+			const framing = namedCamera?.cameraKeys?.[0]?.framing || planCameraFraming({
 				target: targetCenter,
 				shotType: shot.camera?.size ?? "medium",
 				aspectRatio: aspect,
@@ -342,8 +348,10 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 			const move = shot.camera?.move;
  const d = move?.distanceMeters || 0;
  const endFraming = move?.kind === "push-in" ? { ...framing, pos: { x: framing.pos.x - Math.sin(framing.yaw) * Math.cos(framing.pitch) * d, y: framing.pos.y + Math.sin(framing.pitch) * d, z: framing.pos.z - Math.cos(framing.yaw) * Math.cos(framing.pitch) * d } } : null;
- const cameraKeys = generateShotCameraKeys({ durationFrames: shotDuration, startFraming: framing, endFraming });
- const cameraId = `cam_${shot.id}`;
+ const cameraKeys = namedCamera?.cameraKeys || generateShotCameraKeys({ durationFrames: shotDuration, startFraming: framing, endFraming });
+ const cameraId = namedCamera?.id || `cam_${shot.id}`;
+ const cameraOffsetFrame = namedCamera ? shot.cameraOffsetFrame || 0 : 0;
+ const cameraInterpolation = namedCamera?.interpolation || "smooth";
 			compiledShots.push({
 				id: shot.id,
 				sceneId: scene.id,
@@ -351,6 +359,7 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 				endFrameExclusive: sceneEndExclusive,
 				durationFrames: shotDuration,
 				cameraId,
+				cameraOffsetFrame,
 				framing,
 			});
 
@@ -378,6 +387,9 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					cameraId,
 					framing,
 					cameraKeys,
+					cameraOffsetFrame,
+					cameraInterpolation,
+					directive: shot.directive,
 				}),
 				review: "ready",
 				payload: {
@@ -388,6 +400,10 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					cameraId,
 					framing,
 					cameraKeys,
+					cameraOffsetFrame,
+					cameraInterpolation,
+					cameraName: namedCamera?.name,
+					directive: shot.directive,
 				},
 			});
 
@@ -406,6 +422,9 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 				name: scene.name,
 				durationFrames: sceneDurationFrames,
 				setId: scene.setId,
+				entryState: scene.entryState,
+				exitState: scene.exitState,
+				summary: scene.summary,
 			}),
 			review: "ready",
 			payload: {
@@ -413,6 +432,10 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 				name: scene.name ?? `Scene ${scIdx + 1}`,
 				durationFrames: sceneDurationFrames,
 				setId: scene.setId,
+				entryState: scene.entryState,
+				exitState: scene.exitState,
+				summary: scene.summary,
+				timeContext: scene.timeContext,
 			},
 		});
 
@@ -559,6 +582,7 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					contactFrame,
 					releaseFrame,
 					interaction: action.interaction || null,
+					directive: action,
 				}),
 				review: "ready",
 				payload: {
@@ -575,11 +599,16 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					endFrameExclusive: interval.endFrameExclusive,
 					durationFrames: interval.durationFrames,
 					description: action.description,
+					intent: action.intent,
+					trajectory: action.trajectory,
+					eventId: action.eventId,
+					participantIds: action.participantIds,
+					effects: action.effects,
 				},
 			});
 		} else {
 			const desc = (action.description || "").toLowerCase();
-			const motionKind = action.motionKind || (/wave|salu/.test(desc) ? "wave" : /walk|march|avance/.test(desc) ? "walk" : /nod|tête|tete/.test(desc) ? "nod" : /talk|parl/.test(desc) ? "talk" : /idle|immobile|attend/.test(desc) ? "idle" : "custom");
+			const motionKind = snapshot.schemaVersion === "cozy-story-v2" ? "directive" : action.motionKind || (/wave|salu/.test(desc) ? "wave" : /walk|march|avance/.test(desc) ? "walk" : /nod|tête|tete/.test(desc) ? "nod" : /talk|parl/.test(desc) ? "talk" : /idle|immobile|attend/.test(desc) ? "idle" : "custom");
 			actionUnits.push({
 				id: `unit_motion_${action.id}`,
 				kind: "motion-clip",
@@ -597,6 +626,7 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					endFrameExclusive: interval.endFrameExclusive,
 					description: action.description,
 					motionKind,
+					directive: action,
 				}),
 				review: "ready",
 				payload: {
@@ -609,6 +639,12 @@ export function compile(snapshot, overrides = {}, capabilities = {}) {
 					kind: action.kind,
 					motionKind,
 					description: action.description,
+					objectId: action.objectId,
+					intent: action.intent,
+					trajectory: action.trajectory,
+					eventId: action.eventId,
+					participantIds: action.participantIds,
+					effects: action.effects,
 				},
 			});
 		}

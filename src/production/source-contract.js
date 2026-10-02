@@ -1,7 +1,10 @@
 // Canonical JSON, validation and limits for the CozyStory v1 remote source contract.
 // Pure ECMAScript (browser and Node compatible, no node-only module imports).
 
+import { validateNarrativeSnapshot } from "./source-v2-validation.js";
+
 export const SOURCE_SCHEMA_VERSION = "cozy-story-v1";
+export const SOURCE_SCHEMA_VERSIONS = Object.freeze([SOURCE_SCHEMA_VERSION, "cozy-story-v2"]);
 
 export const SOURCE_LIMITS = Object.freeze({
 	maxDurationSeconds: 1200,
@@ -110,7 +113,7 @@ export function validateManifest(manifest) {
 		return { valid: false, errors: [{ path: "/", code: "INVALID_ROOT", message: "Manifest must be an object." }] };
 	}
 
-	if (manifest.schemaVersion !== SOURCE_SCHEMA_VERSION) {
+	if (!SOURCE_SCHEMA_VERSIONS.includes(manifest.schemaVersion)) {
 		pushError(errors, "/schemaVersion", "UNSUPPORTED_SCHEMA", `Expected ${SOURCE_SCHEMA_VERSION}, received ${manifest.schemaVersion}`);
 	}
 	if (!isValidId(manifest.projectId)) {
@@ -189,7 +192,7 @@ export function validateSectionPage(page, expectedSection = null) {
 		return { valid: false, errors: [{ path: "/", code: "INVALID_ROOT", message: "Section page must be an object." }] };
 	}
 
-	if (page.schemaVersion !== SOURCE_SCHEMA_VERSION) {
+	if (!SOURCE_SCHEMA_VERSIONS.includes(page.schemaVersion)) {
 		pushError(errors, "/schemaVersion", "UNSUPPORTED_SCHEMA", `Expected ${SOURCE_SCHEMA_VERSION}, received ${page.schemaVersion}`);
 	}
 	if (!isValidId(page.projectId)) {
@@ -227,7 +230,7 @@ export function validateSnapshot(snapshot) {
 		return { valid: false, errors: [{ path: "/", code: "INVALID_ROOT", message: "Snapshot must be an object." }] };
 	}
 
-	if (snapshot.schemaVersion !== SOURCE_SCHEMA_VERSION) {
+	if (!SOURCE_SCHEMA_VERSIONS.includes(snapshot.schemaVersion)) {
 		pushError(errors, "/schemaVersion", "UNSUPPORTED_SCHEMA", `Expected ${SOURCE_SCHEMA_VERSION}`);
 	}
 	if (!isValidId(snapshot.projectId)) {
@@ -455,6 +458,9 @@ export function validateSnapshot(snapshot) {
 		});
 	}
 
+	if (snapshot.schemaVersion === "cozy-story-v2" && errors.length === 0) {
+		errors.push(...validateNarrativeSnapshot(snapshot));
+	}
 	return { valid: errors.length === 0, errors };
 }
 

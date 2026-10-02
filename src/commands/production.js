@@ -140,12 +140,15 @@ export function register(registry, ports) {
 			const prep = ctrl.prepare(snapshot, doc.overrides || {});
 			if (!prep.plan) fail("INVALID_ARGUMENT", "Compilation failed: " + prep.issues.map(i => i.message).join("; "));
 
-			owner().writePlan((currentPlan) => ({
-				...(prep.plan || currentPlan),
+			// Persist the same JSON data shape as the source contract; optional
+			// compiler fields may be undefined, which the document store rejects.
+			const preparedPlan = JSON.parse(JSON.stringify({
+				...prep.plan,
 				accepted: false,
 				issues: prep.issues || [],
 				preparedAt: new Date().toISOString(),
 			}));
+			owner().writePlan(preparedPlan);
 
 			const updatedDoc = owner().read();
 			return {
@@ -155,8 +158,14 @@ export function register(registry, ports) {
 					productionId,
 					planRevision: updatedDoc.planRevision,
 					unitsCount: prep.plan?.units?.length || 0,
-					issues: (prep.issues || []).slice(0, 10),
-					plan: prep.plan,
+					issuesCount: prep.issues?.length || 0,
+					// The panel reads the full plan and issues from the domain.
+					// Keep the command receipt bounded regardless of story size.
+					issues: (prep.issues || []).slice(0, 3).map(issue => ({
+						code: [...String(issue.code || "")].slice(0, 48).join(""),
+						message: [...String(issue.message || "")].slice(0, 160).join(""),
+					})),
+					details: { action: "production.read", args: { productionId, scope: "units", cursor: "0", limit: 20 } },
 				},
 			};
 		},

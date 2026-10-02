@@ -1,6 +1,7 @@
 /** Native production installation. Never manufacture IDs or swallow bus errors. */
 import { objectLibraryEntry } from "../../scene-objects.js";
 import { isCharacterModel } from "../../character-models.js";
+import { DEFAULT_LIBRARY_LIMIT } from "../../asset-library.js";
 export { installScene } from "./scene.js";
 export { installSetObjects } from "./objects.js";
 
@@ -8,7 +9,7 @@ export async function runNative(bus, command, args) {
  if (!bus?.run) throw new Error("Native command bus is required.");
  const result = await bus.run(command, args);
  if (!result || result.ok === false || result.status === "error") {
-  throw new Error(result?.error?.message || result?.error || command + " failed.");
+  throw new Error(result?.message || result?.error?.message || result?.error || command + " failed.");
  }
  return result;
 }
@@ -50,7 +51,8 @@ export async function installSetStructures(unit, context = {}) {
    let id = bindings[bindingKey]?.nativeEntityId;
    const position = prop.position || prop;
    if (!id) {
-    const found = await runNative(bus, "asset.searchLibrary", { query: prop.acquisition.query || prop.name, limit: 10 });
+    const found = await runNative(bus, "asset.searchLibrary", { query: prop.acquisition.query || prop.name, limit: DEFAULT_LIBRARY_LIMIT });
+    if (found.output?.reason) throw new Error("Library unavailable for " + (prop.name || prop.id) + ": " + found.output.reason);
     const model = found.output?.models?.find(m => m.usable && !m.heavy && m.downloadUrl && (!prop.acquisition.modelId || m.id === prop.acquisition.modelId));
     if (!model) throw new Error("No usable library model for " + prop.id + "; choose a resource or a procedural object explicitly.");
     const args = { id: model.id, title: model.title, license: model.license, downloadUrl: model.downloadUrl,
@@ -98,17 +100,18 @@ export async function installShots(units, context = {}) {
   const nativeSceneId = await selectScene(unit, context);
   const shot = unit.payload, cameraId = shot.cameraId;
   const cameraKey = key(shot.sceneId, cameraId);
-  if (!bindings[cameraKey]) {
-   const id = createdId(await runNative(bus, "camera.create", { cameraId, name: "Camera " + shot.shotId }), "camera.create");
+  if (!bindings[cameraKey] && !nextBindings[cameraKey]) {
+   const id = createdId(await runNative(bus, "camera.create", { cameraId, name: shot.cameraName || "Camera " + shot.shotId }), "camera.create");
    const bound = binding(unit, cameraId, id, "camera", nativeSceneId);
    nextBindings[cameraKey] = bound;
    onBinding?.({ [cameraKey]: bound });
   }
   const nativeCameraId = bindings[cameraKey]?.nativeEntityId || nextBindings[cameraKey].nativeEntityId;
   await runNative(bus, "camera.set", { cameraId: nativeCameraId,
-   set: { cameraKeys: shot.cameraKeys || [{ frame: 0, framing: { pos: { ...shot.framing.pos }, yaw: shot.framing.yaw, pitch: shot.framing.pitch, fovDeg: shot.framing.fovDeg } }] } });
+   set: { mode: "keys", interpolation: shot.cameraInterpolation || "smooth", cameraKeys: shot.cameraKeys || [{ frame: 0, framing: { pos: { ...shot.framing.pos }, yaw: shot.framing.yaw, pitch: shot.framing.pitch, fovDeg: shot.framing.fovDeg } }] } });
   await runNative(bus, "shot.upsert", { shotId: shot.shotId, cameraId: nativeCameraId,
-   name: "Shot " + shot.shotId, startFrame: shot.startFrame, endFrameExclusive: shot.endFrameExclusive });
+   name: "Shot " + shot.shotId, startFrame: shot.startFrame, endFrameExclusive: shot.endFrameExclusive,
+   cameraOffsetFrame: shot.cameraOffsetFrame || 0 });
   nextBindings[key(shot.sceneId, shot.shotId)] = binding(unit, shot.shotId, shot.shotId, "shot", nativeSceneId);
   installed.push(shot.shotId);
  }

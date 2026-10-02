@@ -35,9 +35,10 @@ const extra = [
     endFrameExclusive: { type: 'integer', minimum: 1 },
     name: { type: 'string', maxLength: 240 },
     cameraId: { type: 'string' },
+    cameraOffsetFrame: { type: 'integer', minimum: 0, maximum: 28799 },
   }, ['shotId', 'startFrame', 'endFrameExclusive'])),
 ];
-export const declarations = Object.freeze([extra[0], ...existing, ...extra.slice(1).map(entry => entry.id === 'shot.frame' ? entry : { ...entry, exposure: 'ui-only' })]);
+export const declarations = Object.freeze([extra[0], ...existing, ...extra.slice(1).map(entry => ['shot.frame','shot.upsert'].includes(entry.id) ? entry : { ...entry, exposure: 'ui-only' })]);
 
 export function register(registry, ports) {
   const owner = () => ports.storeDomain('shot');
@@ -85,7 +86,7 @@ export function register(registry, ports) {
     'shot.replace': ({ shots }) => owner().write(shots),
     'shot.captureCamera': args => owner().captureCamera(args.shotId),
     'shot.placeCamera': args => owner().placeCamera(args),
-    'shot.upsert': ({ shotId, startFrame, endFrameExclusive, name, cameraId }) => {
+    'shot.upsert': ({ shotId, startFrame, endFrameExclusive, name, cameraId, cameraOffsetFrame }) => {
       const endFrame = endFrameExclusive - 1;
       if (endFrame < startFrame) fail('INVALID_ARGUMENT', `Shot ${shotId} end frame (${endFrame}) must be >= start frame (${startFrame}).`);
       owner().write(current => {
@@ -99,6 +100,7 @@ export function register(registry, ports) {
           startFrame,
           endFrame,
           ...(cameraId !== undefined ? { cameraId } : {}),
+          ...(cameraOffsetFrame !== undefined ? { cameraOffsetFrame } : {}),
         };
         if (existingIndex >= 0) {
           const next = [...current];

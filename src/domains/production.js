@@ -147,6 +147,7 @@ export function createProductionDomain(appContext) {
 		return write(before => ({
 			...before,
 			source: sourceObj,
+			...(before.source && (before.source.projectId !== sourceObj?.projectId || before.source.revision !== sourceObj?.revision) ? {agentExecution:null} : {}),
 			...(before.source && (before.source.projectId !== sourceObj?.projectId || before.source.revision !== sourceObj?.revision) ? { planRevision: (before.planRevision || 0) + 1, plan: { ...createDefaultProductionDocument().plan }, overrides: [], ...(before.source.projectId !== sourceObj?.projectId ? { bindings: {}, artifacts: {}, executionCheckpoint: { units: [], events: [], runs: [] } } : {}) } : {}),
 		}));
 	}

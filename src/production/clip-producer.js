@@ -45,7 +45,7 @@ export async function produceMotionClip(unit, { signal = null } = {}) {
 	const durationFrames = Math.max(1, endFrame - startFrame);
 
 	// Select preset or default idle
-	const preset = MOTION_PRESETS[actionType];
+	const preset = actionType === "directive" ? { kind: "directive", rootMotion: Boolean(payload.trajectory?.length) } : MOTION_PRESETS[actionType];
 	if (!preset) throw new Error("Unknown motion intent: " + actionType);
 
 	// Deterministic clip representation
@@ -65,6 +65,12 @@ export async function produceMotionClip(unit, { signal = null } = {}) {
 		blendOutFrames: 6,
 		metadata: {
 			description: payload.description || `Action ${actionType} for ${characterId}`,
+			intent: payload.intent,
+			objectId: payload.objectId,
+			trajectory: payload.trajectory,
+			eventId: payload.eventId,
+			participantIds: payload.participantIds,
+			effects: payload.effects,
 			inputHash: unit.inputHash,
 		},
 	};
